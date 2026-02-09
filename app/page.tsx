@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import type { Post } from '@/types/database'
+import type { Post, SiteSettings } from '@/types/database'
 import Nav from '@/components/Nav'
 
 export const revalidate = 0
@@ -21,8 +21,25 @@ async function getPosts() {
   return data as Post[]
 }
 
+async function getSiteSettings() {
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('*')
+    .single()
+  
+  if (error || !data) {
+    return {
+      hero_title: '생각을 기록하는 공간',
+      hero_subtitle: '경제, 책, 영화, 그리고 세상에 대한 이야기를 나눕니다.'
+    }
+  }
+  
+  return data as SiteSettings
+}
+
 export default async function Home() {
   const posts = await getPosts()
+  const settings = await getSiteSettings()
 
   return (
     <>
@@ -32,10 +49,10 @@ export default async function Home() {
         <div className="border-b border-gray-200">
           <div className="max-w-4xl mx-auto px-8 py-32">
             <h1 className="text-7xl font-bold text-gray-900 mb-8 leading-tight">
-              Long Journey
+              {settings.hero_title}
             </h1>
             <p className="text-2xl text-gray-500 leading-relaxed max-w-2xl">
-              좋은 것을 얻기 위해서는, 오래 노력해야 함을 알고 있습니다. 세상의 다양한 이야기를 기록합니다.
+              {settings.hero_subtitle}
             </p>
           </div>
         </div>

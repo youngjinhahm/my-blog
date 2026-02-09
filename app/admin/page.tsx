@@ -169,6 +169,12 @@ export default function AdminPage() {
             >
               소개 페이지 수정
             </Link>
+            <Link
+              href="/admin/settings"
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
+            >
+              사이트 설정
+            </Link>
             <button
               onClick={handleNewPost}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
