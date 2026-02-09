@@ -21,7 +21,7 @@ export default function AdminPage() {
     content: '',
     excerpt: '',
     published: false,
-    category: '경제' as '경제' | '책' | '영화' | '세상'
+    category: '경제' as string
   })
 
   useEffect(() => {
