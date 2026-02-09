@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Post } from '@/types/database'
-import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
+import Navigation from '@/components/Navigation'
 
 export const revalidate = 0
 
@@ -33,34 +33,41 @@ export default async function PostPage({
   }
 
   return (
-    <main className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto px-4 py-16">
-        <Link 
-          href="/" 
-          className="text-blue-600 hover:text-blue-700 mb-8 inline-block"
-        >
-          ← 목록으로
-        </Link>
+    <>
+      <Navigation />
+      <main className="min-h-screen bg-white">
+        <div className="max-w-3xl mx-auto px-6 py-20">
+          <Link 
+            href={`/category/${post.category}`}
+            className="text-gray-600 hover:text-gray-900 mb-8 inline-block transition"
+          >
+            ← {post.category}로 돌아가기
+          </Link>
 
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            {post.title}
-          </h1>
-          <time className="text-gray-600">
-            {new Date(post.created_at).toLocaleDateString('ko-KR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </time>
-        </header>
+          <header className="mb-12">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-sm font-medium text-gray-500">
+                {post.category}
+              </span>
+              <time className="text-sm text-gray-400">
+                {new Date(post.created_at).toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </time>
+            </div>
+            <h1 className="text-5xl font-bold text-gray-900 leading-tight">
+              {post.title}
+            </h1>
+          </header>
 
-        <article className="prose prose-lg max-w-none">
-          <ReactMarkdown>
-            {post.content}
-          </ReactMarkdown>
-        </article>
-      </div>
-    </main>
+          <article 
+            className="prose prose-lg max-w-none"
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
+        </div>
+      </main>
+    </>
   )
 }

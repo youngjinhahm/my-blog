@@ -8,6 +8,7 @@ export interface Post {
   excerpt: string | null
   published: boolean
   author_id: string | null
+  category: '경제' | '책' | '영화' | '세상'
 }
 
 export interface Comment {
@@ -18,4 +19,10 @@ export interface Comment {
   author_email: string
   content: string
   approved: boolean
+}
+
+export interface About {
+  id: string
+  updated_at: string
+  content: string
 }

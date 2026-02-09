@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Post } from '@/types/database'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import RichTextEditor from '@/components/RichTextEditor'
 
 export default function AdminPage() {
   const router = useRouter()
@@ -19,7 +20,8 @@ export default function AdminPage() {
     slug: '',
     content: '',
     excerpt: '',
-    published: false
+    published: false,
+    category: '경제' as '경제' | '책' | '영화' | '세상'
   })
 
   useEffect(() => {
@@ -64,7 +66,8 @@ export default function AdminPage() {
       slug: '',
       content: '',
       excerpt: '',
-      published: false
+      published: false,
+      category: '경제'
     })
     setShowForm(true)
   }
@@ -76,7 +79,8 @@ export default function AdminPage() {
       slug: post.slug,
       content: post.content,
       excerpt: post.excerpt || '',
-      published: post.published
+      published: post.published,
+      category: post.category
     })
     setShowForm(true)
   }
@@ -93,6 +97,7 @@ export default function AdminPage() {
           content: formData.content,
           excerpt: formData.excerpt || null,
           published: formData.published,
+          category: formData.category,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingPost.id)
@@ -113,6 +118,7 @@ export default function AdminPage() {
           content: formData.content,
           excerpt: formData.excerpt || null,
           published: formData.published,
+          category: formData.category,
           author_id: user.id
         }])
       
@@ -148,7 +154,7 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-16">
+      <div className="max-w-7xl mx-auto px-4 py-16">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">관리자 페이지</h1>
@@ -157,6 +163,12 @@ export default function AdminPage() {
             </Link>
           </div>
           <div className="flex gap-4">
+            <Link
+              href="/admin/about"
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
+            >
+              소개 페이지 수정
+            </Link>
             <button
               onClick={handleNewPost}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -177,32 +189,50 @@ export default function AdminPage() {
             <h2 className="text-2xl font-bold mb-6">
               {editingPost ? '글 수정' : '새 글 작성'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  제목
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    제목
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    슬러그 (URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="예: my-first-post"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  슬러그 (URL)
+                  카테고리
                 </label>
-                <input
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({...formData, category: e.target.value as any})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="예: my-first-post"
-                  required
-                />
+                >
+                  <option value="경제">경제</option>
+                  <option value="책">책</option>
+                  <option value="영화">영화</option>
+                  <option value="세상">세상</option>
+                </select>
               </div>
 
               <div>
@@ -214,19 +244,17 @@ export default function AdminPage() {
                   onChange={(e) => setFormData({...formData, excerpt: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={2}
+                  placeholder="글 목록에 표시될 짧은 요약을 작성하세요"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  내용 (Markdown 지원)
+                  내용
                 </label>
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                  rows={15}
-                  required
+                <RichTextEditor
+                  content={formData.content}
+                  onChange={(html) => setFormData({...formData, content: html})}
                 />
               </div>
 
@@ -236,7 +264,7 @@ export default function AdminPage() {
                   id="published"
                   checked={formData.published}
                   onChange={(e) => setFormData({...formData, published: e.target.checked})}
-                  className="mr-2"
+                  className="mr-2 w-4 h-4"
                 />
                 <label htmlFor="published" className="text-sm font-medium text-gray-700">
                   발행하기
@@ -246,14 +274,14 @@ export default function AdminPage() {
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
                 >
                   {editingPost ? '수정 완료' : '작성 완료'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition"
+                  className="bg-gray-200 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
                   취소
                 </button>
@@ -267,6 +295,7 @@ export default function AdminPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">제목</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">카테고리</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">작성일</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">작업</th>
@@ -275,7 +304,7 @@ export default function AdminPage() {
             <tbody className="divide-y divide-gray-200">
               {posts.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     아직 작성된 글이 없습니다.
                   </td>
                 </tr>
@@ -285,6 +314,9 @@ export default function AdminPage() {
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{post.title}</div>
                       <div className="text-sm text-gray-500">{post.slug}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-600">{post.category}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
