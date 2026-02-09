@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Navigation from '../../../components/Navigation'
 
 export const revalidate = 0
-export const dynamicParams = true  // 이 줄 추가!
+export const dynamicParams = true
 
 async function getPost(slug: string) {
   const { data, error } = await supabase
@@ -25,9 +25,10 @@ async function getPost(slug: string) {
 export default async function PostPage({ 
   params 
 }: { 
-  params: { slug: string } 
+  params: Promise<{ slug: string }>  // 이 줄 수정!
 }) {
-  const post = await getPost(params.slug)
+  const { slug } = await params  // 이 줄 수정!
+  const post = await getPost(slug)  // 이 줄 수정!
 
   if (!post) {
     notFound()
