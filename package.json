@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/storage-js": "^2.95.3",
     "@supabase/supabase-js": "^2.95.3",
+    "@tiptap/extension-image": "^3.19.0",
     "@tiptap/extension-link": "^3.19.0",
     "@tiptap/extension-placeholder": "^3.19.0",
     "@tiptap/extension-text-align": "^3.19.0",

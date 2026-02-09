@@ -5,8 +5,10 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
 
 interface RichTextEditorProps {
   content: string
@@ -14,7 +16,10 @@ interface RichTextEditorProps {
 }
 
 export default function RichTextEditor({ content, onChange }: RichTextEditorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const editor = useEditor({
+    immediatelyRender: false,  // 이 줄 추가!
     extensions: [
       StarterKit,
       Underline,
@@ -23,6 +28,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       }),
       Link.configure({
         openOnClick: false,
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
       }),
       Placeholder.configure({
         placeholder: '글 내용을 작성하세요...',
@@ -36,6 +45,33 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none min-h-[500px] px-6 py-4',
       },
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
+          const file = event.dataTransfer.files[0]
+          if (file.type.startsWith('image/')) {
+            event.preventDefault()
+            uploadImage(file)
+            return true
+          }
+        }
+        return false
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+              const file = items[i].getAsFile()
+              if (file) {
+                event.preventDefault()
+                uploadImage(file)
+                return true
+              }
+            }
+          }
+        }
+        return false
+      },
     },
   })
 
@@ -45,12 +81,56 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }, [content, editor])
 
+  async function uploadImage(file: File) {
+    if (!editor) return
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { data, error } = await supabase.storage
+        .from('blog-images')
+        .upload(filePath, file)
+
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('blog-images')
+        .getPublicUrl(filePath)
+
+      editor.chain().focus().setImage({ src: publicUrl }).run()
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('이미지 업로드 실패: ' + (error as Error).message)
+    }
+  }
+
+  function handleImageButtonClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      uploadImage(file)
+    }
+  }
+
   if (!editor) {
     return null
   }
 
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      
       {/* 툴바 */}
       <div className="bg-gray-50 border-b border-gray-300 p-2 flex flex-wrap gap-1">
         <button
@@ -154,6 +234,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           title="인용"
         >
           " 인용
+        </button>
+
+        <div className="w-px bg-gray-300 mx-2" />
+
+        <button
+          type="button"
+          onClick={handleImageButtonClick}
+          className="px-3 py-1.5 rounded hover:bg-gray-200 transition"
+          title="이미지 업로드"
+        >
+          🖼️ 이미지
         </button>
 
         <div className="w-px bg-gray-300 mx-2" />
