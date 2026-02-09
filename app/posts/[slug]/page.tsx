@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 
 export const revalidate = 0
+export const dynamicParams = true  // 이 줄 추가
 
 async function getPost(slug: string) {
   const { data, error } = await supabase
