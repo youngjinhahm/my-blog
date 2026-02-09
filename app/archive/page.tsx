@@ -11,7 +11,6 @@ async function getPosts() {
     .select('*')
     .eq('published', true)
     .order('created_at', { ascending: false })
-    .limit(3)
   
   if (error) {
     console.error('Error fetching posts:', error)
@@ -21,36 +20,21 @@ async function getPosts() {
   return data as Post[]
 }
 
-export default async function Home() {
+export default async function ArchivePage() {
   const posts = await getPosts()
 
   return (
     <>
       <Nav />
       <main className="min-h-screen bg-white">
-        {/* 히어로 섹션 */}
-        <div className="border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-8 py-32">
-            <h1 className="text-7xl font-bold text-gray-900 mb-8 leading-tight">
-              Long Journey
-            </h1>
-            <p className="text-2xl text-gray-500 leading-relaxed max-w-2xl">
-              좋은 것을 얻기 위해서는, 오래 노력해야 함을 알고 있습니다. 세상의 다양한 이야기를 기록합니다.
-            </p>
-          </div>
-        </div>
-
-        {/* 최근 글 섹션 */}
         <div className="max-w-4xl mx-auto px-8 py-20">
           <div className="flex gap-16">
-            {/* 왼쪽 라벨 */}
             <div className="w-32 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900 sticky top-8">
-                Recent
-              </h2>
+              <h1 className="text-lg font-semibold text-gray-900 sticky top-8">
+                All Essays
+              </h1>
             </div>
 
-            {/* 오른쪽 글 목록 */}
             <div className="flex-1 space-y-16">
               {posts.length === 0 ? (
                 <p className="text-gray-400 py-12">
@@ -68,9 +52,12 @@ export default async function Home() {
                             year: 'numeric'
                           }).toUpperCase()}
                         </time>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-600 transition">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-600 transition">
                           {post.title}
-                        </h3>
+                        </h2>
+                        <div className="text-sm text-gray-500 mb-2">
+                          {post.category}
+                        </div>
                         {post.excerpt && (
                           <p className="text-base text-gray-600 leading-relaxed">
                             {post.excerpt}

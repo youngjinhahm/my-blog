@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import type { Post } from '../../../types/database'
-import Navigation from '../../../components/Navigation'
+import Nav from '../../../components/Nav'
 import { notFound } from 'next/navigation'
 
 export const revalidate = 0
@@ -27,10 +27,10 @@ async function getPosts(category: string) {
 export default async function CategoryPage({ 
   params 
 }: { 
-  params: Promise<{ name: string }>  // 이 줄 수정!
+  params: Promise<{ name: string }>
 }) {
-  const { name } = await params  // 이 줄 수정!
-  const category = decodeURIComponent(name)  // 이 줄 수정!
+  const { name } = await params
+  const category = decodeURIComponent(name)
   
   if (!validCategories.includes(category as any)) {
     notFound()
@@ -40,50 +40,47 @@ export default async function CategoryPage({
 
   return (
     <>
-      <Navigation />
+      <Nav />
       <main className="min-h-screen bg-white">
-        <div className="max-w-3xl mx-auto px-6 py-20">
-          <header className="mb-20">
-            <h1 className="text-5xl font-bold text-gray-900 mb-4 leading-tight">
-              {category}
-            </h1>
-            <p className="text-xl text-gray-600">
-              {category} 관련 글 모음
-            </p>
-          </header>
+        <div className="max-w-4xl mx-auto px-8 py-20">
+          <div className="flex gap-16">
+            <div className="w-32 flex-shrink-0">
+              <h1 className="text-lg font-semibold text-gray-900 sticky top-8">
+                {category}
+              </h1>
+            </div>
 
-          <div className="space-y-16">
-            {posts.length === 0 ? (
-              <p className="text-gray-500 text-center py-20">
-                아직 {category} 카테고리에 작성된 글이 없습니다.
-              </p>
-            ) : (
-              posts.map((post) => (
-                <article key={post.id}>
-                  <Link href={`/posts/${post.slug}`}>
-                    <div className="group">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-sm text-gray-400">
-                          {new Date(post.created_at).toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </span>
+            <div className="flex-1 space-y-16">
+              {posts.length === 0 ? (
+                <p className="text-gray-400 py-12">
+                  아직 {category} 카테고리에 작성된 글이 없습니다.
+                </p>
+              ) : (
+                posts.map((post) => (
+                  <article key={post.id}>
+                    <Link href={`/posts/${post.slug}`}>
+                      <div className="group">
+                        <time className="text-sm font-medium text-gray-500 block mb-3">
+                          {new Date(post.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          }).toUpperCase()}
+                        </time>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-600 transition">
+                          {post.title}
+                        </h2>
+                        {post.excerpt && (
+                          <p className="text-base text-gray-600 leading-relaxed">
+                            {post.excerpt}
+                          </p>
+                        )}
                       </div>
-                      <h2 className="text-3xl font-bold text-gray-900 mb-3 group-hover:text-gray-600 transition leading-tight">
-                        {post.title}
-                      </h2>
-                      {post.excerpt && (
-                        <p className="text-lg text-gray-600 leading-relaxed">
-                          {post.excerpt}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                </article>
-              ))
-            )}
+                    </Link>
+                  </article>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </main>
