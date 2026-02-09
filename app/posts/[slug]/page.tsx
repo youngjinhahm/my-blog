@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import type { Post } from '@/types/database'
+import { supabase } from '../../../lib/supabase'
+import type { Post } from '../../../types/database'
 import Link from 'next/link'
-import Navigation from '@/components/Navigation'
+import Navigation from '../../../components/Navigation'
 
 export const revalidate = 0
-export const dynamicParams = true  // 이 줄 추가
+export const dynamicParams = true  // 이 줄 추가!
 
 async function getPost(slug: string) {
   const { data, error } = await supabase

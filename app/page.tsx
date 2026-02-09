@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { supabase } from '../lib/supabase'
-import type { Post } from '../types/database'
-import Navigation from '../components/Navigation'
+import { supabase } from '@/lib/supabase'
+import type { Post } from '@/types/database'
+import Navigation from '@/components/Navigation'
 
 export const revalidate = 0
 
