@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import type { Post } from '@/types/database'
-import Navigation from '@/components/Navigation'
+import { supabase } from '../../../lib/supabase'
+import type { Post } from '../../../types/database'
+import Navigation from '../../../components/Navigation'
 import { notFound } from 'next/navigation'
 
 export const revalidate = 0
@@ -27,9 +27,10 @@ async function getPosts(category: string) {
 export default async function CategoryPage({ 
   params 
 }: { 
-  params: { name: string } 
+  params: Promise<{ name: string }>  // 이 줄 수정!
 }) {
-  const category = decodeURIComponent(params.name)
+  const { name } = await params  // 이 줄 수정!
+  const category = decodeURIComponent(name)  // 이 줄 수정!
   
   if (!validCategories.includes(category as any)) {
     notFound()
