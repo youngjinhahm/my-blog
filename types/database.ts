@@ -9,6 +9,7 @@ export interface Post {
   published: boolean
   author_id: string | null
   category: string
+  views: number  // 이 줄 추가
 }
 
 export interface Comment {

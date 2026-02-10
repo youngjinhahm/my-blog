@@ -53,7 +53,6 @@ export default async function Home() {
             </h1>
             <div 
               className="text-xl text-gray-500 leading-relaxed max-w-2xl prose prose-lg"
-              style={{  lineHeight: '1'}}
               dangerouslySetInnerHTML={{ __html: settings.hero_subtitle }}
             />
           </div>
@@ -68,6 +67,9 @@ export default async function Home() {
                 Recent
               </h2>
             </div>
+
+            {/* 구분선 추가 */}
+            <div className="w-px bg-gray-200"></div>
 
             {/* 오른쪽 글 목록 */}
             <div className="flex-1 space-y-16">

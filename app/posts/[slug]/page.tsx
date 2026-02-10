@@ -18,6 +18,12 @@ async function getPost(slug: string) {
   if (error || !data) {
     return null
   }
+
+    // 조회수 증가
+  await supabase
+    .from('posts')
+    .update({ views: (data.views || 0) + 1 })
+    .eq('id', data.id)  
   
   return data as Post
 }
