@@ -19,7 +19,7 @@ export default function Navigation() {
       <div className="max-w-4xl mx-auto px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="text-xl font-semibold text-gray-900 hover:text-gray-600 transition">
-            내 블로그
+            Youngjin Hahm : Blog
           </Link>
           
           <div className="flex gap-8">
