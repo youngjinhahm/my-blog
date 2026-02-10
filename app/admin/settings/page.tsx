@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,8 +10,11 @@ export default function AdminSettingsPage() {
   const router = useRouter()
   const [heroTitle, setHeroTitle] = useState('')
   const [heroSubtitle, setHeroSubtitle] = useState('')
+  const [profileImageUrl, setProfileImageUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     checkAuth()
@@ -34,8 +37,47 @@ export default function AdminSettingsPage() {
     if (data) {
       setHeroTitle(data.hero_title)
       setHeroSubtitle(data.hero_subtitle)
+      setProfileImageUrl(data.profile_image_url || '')
     }
     setLoading(false)
+  }
+
+  async function uploadProfileImage(file: File) {
+    setUploading(true)
+
+    const fileExt = file.name.split('.').pop()
+    const fileName = `profile.${fileExt}`
+    const filePath = `${fileName}`
+
+    // 기존 프로필 이미지 삭제
+    await supabase.storage
+      .from('blog-images')
+      .remove([filePath])
+
+    // 새 이미지 업로드
+    const { error: uploadError } = await supabase.storage
+      .from('blog-images')
+      .upload(filePath, file, { upsert: true })
+
+    if (uploadError) {
+      alert('이미지 업로드 실패: ' + uploadError.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('blog-images')
+      .getPublicUrl(filePath)
+
+    setProfileImageUrl(publicUrl)
+    setUploading(false)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      uploadProfileImage(file)
+    }
   }
 
   async function handleSave() {
@@ -46,6 +88,7 @@ export default function AdminSettingsPage() {
       .update({
         hero_title: heroTitle,
         hero_subtitle: heroSubtitle,
+        profile_image_url: profileImageUrl,
         updated_at: new Date().toISOString()
       })
       .eq('id', (await supabase.from('site_settings').select('id').single()).data?.id)
@@ -77,6 +120,46 @@ export default function AdminSettingsPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">사이트 설정</h1>
 
           <div className="space-y-6">
+            {/* 프로필 이미지 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                프로필 이미지
+              </label>
+              <div className="flex items-center gap-4">
+                {profileImageUrl && (
+                  <div className="w-32 h-32 bg-gray-200 rounded-lg overflow-hidden">
+                    <img 
+                      src={profileImageUrl} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 font-medium"
+                  >
+                    {uploading ? '업로드 중...' : profileImageUrl ? '이미지 변경' : '이미지 업로드'}
+                  </button>
+                  <p className="text-sm text-gray-500 mt-2">
+                    정사각형 이미지 권장 (예: 400x400px)
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-6"></div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 히어로 제목

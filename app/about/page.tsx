@@ -10,7 +10,7 @@ async function getAbout() {
     .single()
   
   if (error || !data) {
-    return { content: '' }
+    return { content: '', profile_image_url: null }
   }
   
   return data
@@ -27,11 +27,18 @@ export default async function AboutPage() {
           <div className="flex gap-16 items-start">
             {/* 왼쪽: 프로필 이미지 + 소셜 링크 */}
             <div className="w-80 flex-shrink-0">
-              <div className="bg-gray-200 aspect-square mb-4">
-                {/* 프로필 이미지 영역 */}
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  프로필 이미지
-                </div>
+              <div className="bg-gray-200 aspect-square mb-4 overflow-hidden rounded-lg">
+                {about.profile_image_url ? (
+                  <img 
+                    src={about.profile_image_url} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    프로필 이미지
+                  </div>
+                )}
               </div>
               <p className="text-xs text-gray-500 text-center mb-6">
                 PHOTO BY YOUNGJIN HAHM
@@ -39,7 +46,6 @@ export default async function AboutPage() {
 
               {/* 소셜 링크 */}
               <div className="flex justify-center gap-6">
-                
                 <a
                   href="https://www.instagram.com/youngjinhahm/"
                   target="_blank"

@@ -32,5 +32,6 @@ export interface SiteSettings {
   id: string
   hero_title: string
   hero_subtitle: string
+  profile_image_url: string | null  // 이 줄 추가
   updated_at: string
 }
