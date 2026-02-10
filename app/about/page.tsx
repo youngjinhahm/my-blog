@@ -39,6 +39,7 @@ export default async function AboutPage() {
 
               {/* 소셜 링크 */}
               <div className="flex justify-center gap-6">
+                
                 <a
                   href="https://www.instagram.com/youngjinhahm/"
                   target="_blank"
@@ -81,70 +82,6 @@ export default async function AboutPage() {
                 className="prose prose-lg max-w-none"
                 dangerouslySetInnerHTML={{ __html: about.content }}
               />
-              
-              {/* 연락처 폼 (선택사항) */}
-              <div className="mt-16 pt-16 border-t border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-900 mb-8">Contact</h2>
-                <form className="space-y-6 max-w-xl">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 focus:border-gray-900 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 focus:border-gray-900 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      className="w-full px-4 py-2 border border-gray-300 focus:border-gray-900 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">
-                      Subject
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 border border-gray-300 focus:border-gray-900 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">
-                      Message
-                    </label>
-                    <textarea
-                      rows={6}
-                      className="w-full px-4 py-2 border border-gray-300 focus:border-gray-900 focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="px-8 py-3 bg-gray-900 text-white hover:bg-gray-700 transition font-medium"
-                  >
-                    Send Message
-                  </button>
-                </form>
-              </div>
             </div>
           </div>
         </div>
