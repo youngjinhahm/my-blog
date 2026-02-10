@@ -69,3 +69,12 @@
 .prose strong {
   @apply font-semibold text-gray-900;
 }
+
+/* 에디터 커스텀 스타일 */
+.ProseMirror [style*="fontSize"] {
+  font-size: var(--fontSize) !important;
+}
+
+.ProseMirror [style*="lineHeight"] {
+  line-height: var(--lineHeight) !important;
+}

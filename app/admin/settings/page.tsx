@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import RichTextEditor from '@/components/RichTextEditor'
 
 export default function AdminSettingsPage() {
   const router = useRouter()
@@ -85,23 +86,20 @@ export default function AdminSettingsPage() {
                 value={heroTitle}
                 onChange={(e) => setHeroTitle(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="생각을 기록하는 공간"
+                placeholder="Long Journey"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                히어로 부제
+                히어로 부제 (HTML 사용 가능)
               </label>
-              <textarea
-                value={heroSubtitle}
-                onChange={(e) => setHeroSubtitle(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="경제, 책, 영화, 그리고 세상에 대한 이야기를 나눕니다."
+              <RichTextEditor
+                content={heroSubtitle}
+                onChange={(html) => setHeroSubtitle(html)}
               />
               <p className="text-sm text-gray-500 mt-2">
-                줄바꿈을 원하는 곳에서 Enter를 눌러주세요.
+                폰트 크기, 줄바꿈, 굵기 등을 자유롭게 조정하세요.
               </p>
             </div>
 

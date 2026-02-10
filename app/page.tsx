@@ -48,12 +48,14 @@ export default async function Home() {
         {/* 히어로 섹션 */}
         <div className="border-b border-gray-200">
           <div className="max-w-4xl mx-auto px-8 py-32">
-            <h1 className="text-7xl font-bold text-gray-900 mb-8 leading-tight">
+            <h1 className="text-6xl font-bold text-gray-900 mb-8 leading-tight">
               {settings.hero_title}
             </h1>
-            <p className="text-2xl text-gray-500 leading-relaxed max-w-2xl">
-              {settings.hero_subtitle}
-            </p>
+            <div 
+              className="text-xl text-gray-500 leading-relaxed max-w-2xl prose prose-lg"
+              style={{  lineHeight: '1'}}
+              dangerouslySetInnerHTML={{ __html: settings.hero_subtitle }}
+            />
           </div>
         </div>
 
