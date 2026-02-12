@@ -9,7 +9,7 @@ import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import Color from '@tiptap/extension-color'
 import { Mark } from '@tiptap/core'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // 커스텀 FontSize Mark
@@ -164,7 +164,18 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // Enter 키를 누르면 단락이 아닌 줄바꿈
+        hardBreak: {
+          keepMarks: false,
+        },
+        // 단락 기능 비활성화 (Enter로 줄바꿈만)
+        paragraph: {
+          HTMLAttributes: {
+            class: 'my-0',
+          },
+        },
+      }),
       Underline,
       FontSize,
       Color,
@@ -189,6 +200,27 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] px-4 py-2',
+      },
+      handleKeyDown: (view, event) => {
+        // Enter 키: 줄바꿈
+        if (event.key === 'Enter' && !event.shiftKey) {
+          const { state, dispatch } = view
+          const { schema } = state
+          
+          // Hard break 삽입
+          const br = schema.nodes.hardBreak.create()
+          const tr = state.tr.replaceSelectionWith(br).scrollIntoView()
+          dispatch(tr)
+          
+          return true // 기본 동작 막기
+        }
+        
+        // Shift+Enter: 두 줄 띄우기 (단락)
+        if (event.key === 'Enter' && event.shiftKey) {
+          return false // 기본 paragraph 생성
+        }
+        
+        return false
       },
       handleDrop: function(view, event, slice, moved) {
         if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
@@ -436,7 +468,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       
       {/* 사용 안내 */}
       <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
-        💡 팁: 텍스트를 선택하고 크기 드롭다운에서 선택하면 즉시 적용됩니다. 이미지는 오른쪽 하단 파란색 핸들을 드래그하세요.
+        💡 팁: Enter로 줄바꿈, Shift+Enter로 단락 나누기. 이미지는 오른쪽 하단 파란색 핸들을 드래그하세요.
       </div>
 
       {/* CSS */}
@@ -453,6 +485,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin: 0;
           padding: 0;
           line-height: 0;
+        }
+        .ProseMirror p.my-0 {
+          margin: 0;
+        }
+        .ProseMirror br {
+          content: "";
+          display: block;
+          margin: 0;
         }
       `}</style>
     </div>
