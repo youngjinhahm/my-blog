@@ -47,34 +47,34 @@ export default async function Home() {
       <main className="min-h-screen bg-white">
         {/* 히어로 섹션 */}
         <div className="border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-8 py-32">
-            <h1 className="text-6xl font-bold text-gray-900 mb-8 leading-tight">
+          <div className="max-w-4xl mx-auto px-4 sm:px-8 py-16 sm:py-32">
+            <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight">
               {settings.hero_title}
             </h1>
             <div 
-              className="text-xl text-gray-500 leading-relaxed max-w-2xl prose prose-lg"
+              className="text-lg sm:text-xl text-gray-500 leading-relaxed max-w-2xl prose prose-lg"
               dangerouslySetInnerHTML={{ __html: settings.hero_subtitle }}
             />
           </div>
         </div>
 
         {/* 최근 글 섹션 */}
-        <div className="max-w-4xl mx-auto px-8 py-20">
-          <div className="flex gap-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-8 py-12 sm:py-20">
+          <div className="flex flex-col sm:flex-row gap-8 sm:gap-16">
             {/* 왼쪽 라벨 */}
-            <div className="w-32 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900 sticky top-8">
+            <div className="sm:w-32 flex-shrink-0">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:sticky sm:top-8">
                 Recent
               </h2>
             </div>
 
-            {/* 구분선 추가 */}
-            <div className="w-px bg-gray-200"></div>
+            {/* 구분선 (데스크탑만) */}
+            <div className="hidden sm:block w-px bg-gray-200"></div>
 
             {/* 오른쪽 글 목록 */}
-            <div className="flex-1 space-y-16">
+            <div className="flex-1 space-y-8 sm:space-y-16">
               {posts.length === 0 ? (
-                <p className="text-gray-400 py-12">
+                <p className="text-gray-400 py-8 sm:py-12 text-sm">
                   아직 작성된 글이 없습니다.
                 </p>
               ) : (
@@ -82,18 +82,18 @@ export default async function Home() {
                   <article key={post.id}>
                     <Link href={`/posts/${post.slug}`}>
                       <div className="group">
-                        <time className="text-sm font-medium text-gray-500 block mb-3">
+                        <time className="text-xs sm:text-sm font-medium text-gray-500 block mb-2 sm:mb-3">
                           {new Date(post.created_at).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
                           }).toUpperCase()}
                         </time>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-600 transition">
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3 group-hover:text-gray-600 transition">
                           {post.title}
                         </h3>
                         {post.excerpt && (
-                          <p className="text-base text-gray-600 leading-relaxed">
+                          <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
                             {post.excerpt}
                           </p>
                         )}

@@ -91,20 +91,20 @@ export default function CategoryPage({
       <main className="min-h-screen bg-white">
         {/* Recent 섹션 */}
         <div className="border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-8 py-16">
-            <div className="flex gap-12">
-              <div className="w-28 flex-shrink-0">
-                <h1 className="text-base font-semibold text-gray-900 sticky top-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-16">
+            <div className="flex flex-col sm:flex-row gap-6 sm:gap-12">
+              <div className="sm:w-28 flex-shrink-0">
+                <h1 className="text-base font-semibold text-gray-900 sm:sticky sm:top-8">
                   Recent
                 </h1>
               </div>
 
-              {/* 구분선 추가 */}
-              <div className="w-px bg-gray-200"></div>
+              {/* 구분선 (데스크탑만) */}
+              <div className="hidden sm:block w-px bg-gray-200"></div>
 
-              <div className="flex-1 space-y-12">
+              <div className="flex-1 space-y-8 sm:space-y-12">
                 {recentPosts.length === 0 ? (
-                  <p className="text-gray-400 py-8 text-sm">
+                  <p className="text-gray-400 py-4 sm:py-8 text-sm">
                     아직 {category} 카테고리에 작성된 글이 없습니다.
                   </p>
                 ) : (
@@ -119,11 +119,11 @@ export default function CategoryPage({
                               year: 'numeric'
                             }).toUpperCase()}
                           </time>
-                          <h2 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-gray-600 transition">
+                          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 group-hover:text-gray-600 transition">
                             {post.title}
                           </h2>
                           {post.excerpt && (
-                            <p className="text-sm text-gray-600 leading-relaxed">
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
                               {post.excerpt}
                             </p>
                           )}
@@ -140,18 +140,18 @@ export default function CategoryPage({
         {/* Popular 섹션 */}
         {popularPosts.length > 0 && (
           <div className="border-b border-gray-200">
-            <div className="max-w-4xl mx-auto px-8 py-16">
-              <div className="flex gap-12">
-                <div className="w-28 flex-shrink-0">
-                  <h2 className="text-base font-semibold text-gray-900 sticky top-8">
+            <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-16">
+              <div className="flex flex-col sm:flex-row gap-6 sm:gap-12">
+                <div className="sm:w-28 flex-shrink-0">
+                  <h2 className="text-base font-semibold text-gray-900 sm:sticky sm:top-8">
                     Popular
                   </h2>
                 </div>
 
-                {/* 구분선 추가 */}
-                <div className="w-px bg-gray-200"></div>
+                {/* 구분선 (데스크탑만) */}
+                <div className="hidden sm:block w-px bg-gray-200"></div>
 
-                <div className="flex-1 space-y-12">
+                <div className="flex-1 space-y-8 sm:space-y-12">
                   {popularPosts.map((post) => (
                     <article key={post.id}>
                       <Link href={`/posts/${post.slug}`}>
@@ -169,11 +169,11 @@ export default function CategoryPage({
                               {post.views || 0} views
                             </span>
                           </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-gray-600 transition">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 group-hover:text-gray-600 transition">
                             {post.title}
                           </h3>
                           {post.excerpt && (
-                            <p className="text-sm text-gray-600 leading-relaxed">
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
                               {post.excerpt}
                             </p>
                           )}
@@ -189,20 +189,29 @@ export default function CategoryPage({
 
         {/* 전체 글 목록 */}
         {allPosts.length > 0 && (
-          <div className="max-w-4xl mx-auto px-8 py-12">
-            <h2 className="text-lg font-bold text-gray-900 mb-6">전체 글</h2>
+          <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
+            <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">전체 글</h2>
             
-            {/* 테이블 */}
-            <div className="border-t border-gray-200">
+            {/* 모바일: 카드 형식 / 데스크탑: 테이블 */}
+            <div className="sm:border-t sm:border-gray-200">
               {currentPosts.map((post) => (
                 <Link key={post.id} href={`/posts/${post.slug}`}>
-                  <div className="border-b border-gray-200 py-3 hover:bg-gray-50 transition flex justify-between items-center">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 hover:text-gray-600">
-                        {post.title}
-                      </h3>
-                    </div>
-                    <time className="text-xs text-gray-500 ml-4">
+                  {/* 모바일 */}
+                  <div className="sm:hidden border-b border-gray-200 py-3">
+                    <h3 className="text-sm font-medium text-gray-900 mb-1">
+                      {post.title}
+                    </h3>
+                    <time className="text-xs text-gray-500">
+                      {new Date(post.created_at).toLocaleDateString('ko-KR')}
+                    </time>
+                  </div>
+                  
+                  {/* 데스크탑 */}
+                  <div className="hidden sm:flex border-b border-gray-200 py-3 hover:bg-gray-50 transition justify-between items-center">
+                    <h3 className="text-sm font-medium text-gray-900 hover:text-gray-600 flex-1">
+                      {post.title}
+                    </h3>
+                    <time className="text-xs text-gray-500 ml-4 flex-shrink-0">
                       {new Date(post.created_at).toLocaleDateString('ko-KR', {
                         year: 'numeric',
                         month: 'long',
@@ -216,20 +225,22 @@ export default function CategoryPage({
 
             {/* 페이지네이션 */}
             {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-6">
+              <div className="flex justify-center gap-1 sm:gap-2 mt-6">
                 <button
+                  type="button"
                   onClick={() => paginate(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   이전
                 </button>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
                   <button
+                    type="button"
                     key={number}
                     onClick={() => paginate(number)}
-                    className={`px-3 py-1.5 text-sm border rounded ${
+                    className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm border rounded ${
                       currentPage === number
                         ? 'bg-gray-900 text-white border-gray-900'
                         : 'border-gray-300 hover:bg-gray-50'
@@ -240,9 +251,10 @@ export default function CategoryPage({
                 ))}
                 
                 <button
+                  type="button"
                   onClick={() => paginate(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   다음
                 </button>

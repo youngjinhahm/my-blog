@@ -3,39 +3,74 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const categories = [
-  { name: '소개', href: '/about' },
-  { name: '경제', href: '/category/경제' },
-  { name: '책', href: '/category/책' },
-  { name: '영화', href: '/category/영화' },
-  { name: '세상', href: '/category/세상' },
-]
-
-export default function Navigation() {
+export default function Nav() {
   const pathname = usePathname()
-
+  
   return (
-    <nav className="border-b border-gray-200 bg-white">
-      <div className="max-w-4xl mx-auto px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-semibold text-gray-900 hover:text-gray-600 transition">
+    <nav className="border-b border-gray-200 bg-white sticky top-0 z-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-16">
+          {/* 로고 */}
+          <Link href="/" className="text-base sm:text-lg font-bold text-gray-900 hover:text-gray-600 transition flex-shrink-0">
             Youngjin Hahm : Blog
           </Link>
           
-          <div className="flex gap-8">
-            {categories.map((category) => (
-              <Link
-                key={category.href}
-                href={category.href}
-                className={`text-sm transition ${
-                  pathname === category.href || pathname.startsWith(category.href)
-                    ? 'text-gray-900 font-medium'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {category.name}
-              </Link>
-            ))}
+          {/* 메뉴 */}
+          <div className="flex items-center gap-3 sm:gap-6">
+            <Link 
+              href="/about"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname === '/about' 
+                  ? 'text-gray-900' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              소개
+            </Link>
+            
+            <Link 
+              href="/category/경제"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname.includes('/category/경제') 
+                  ? 'text-gray-900' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              경제
+            </Link>
+            
+            <Link 
+              href="/category/책"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname.includes('/category/책') 
+                  ? 'text-gray-900' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              책
+            </Link>
+            
+            <Link 
+              href="/category/영화"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname.includes('/category/영화') 
+                  ? 'text-gray-900' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              영화
+            </Link>
+            
+            <Link 
+              href="/category/세상"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname.includes('/category/세상') 
+                  ? 'text-gray-900' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              세상
+            </Link>
           </div>
         </div>
       </div>

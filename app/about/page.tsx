@@ -23,11 +23,11 @@ export default async function AboutPage() {
     <>
       <Nav />
       <main className="min-h-screen bg-white">
-        <div className="max-w-5xl mx-auto px-8 py-20">
-          <div className="flex gap-16 items-start">
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-12 sm:py-20">
+          <div className="flex flex-col sm:flex-row gap-8 sm:gap-16 items-start">
             {/* 왼쪽: 프로필 이미지 + 소셜 링크 */}
-            <div className="w-80 flex-shrink-0">
-              <div className="bg-gray-200 aspect-square mb-4 overflow-hidden rounded-lg">
+            <div className="w-full sm:w-80 flex-shrink-0">
+              <div className="bg-gray-200 aspect-square mb-4 overflow-hidden rounded-lg max-w-sm mx-auto sm:max-w-none">
                 {about.profile_image_url ? (
                   <img 
                     src={about.profile_image_url} 
@@ -85,7 +85,9 @@ export default async function AboutPage() {
             {/* 오른쪽: 소개 텍스트 */}
             <div className="flex-1">
               <div 
-                className="prose prose-lg max-w-none"
+                className="prose prose-sm sm:prose-lg max-w-none
+                  prose-headings:font-bold
+                  prose-p:text-gray-700 prose-p:leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: about.content }}
               />
             </div>

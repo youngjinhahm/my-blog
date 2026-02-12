@@ -1,98 +1,89 @@
 import { notFound } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import type { Post } from '../../../types/database'
-import Link from 'next/link'
 import Nav from '../../../components/Nav'
 
 export const revalidate = 0
-export const dynamicParams = true
 
 async function getPost(slug: string) {
   const { data, error } = await supabase
     .from('posts')
     .select('*')
     .eq('slug', slug)
-    .eq('published', true)
     .single()
-  
+
   if (error || !data) {
     return null
   }
 
-    // 조회수 증가
+  // 조회수 증가
   await supabase
     .from('posts')
     .update({ views: (data.views || 0) + 1 })
-    .eq('id', data.id)  
-  
+    .eq('id', data.id)
+
   return data as Post
 }
 
-export default async function PostPage({ 
-  params 
-}: { 
-  params: Promise<{ slug: string }>
+export default async function PostPage({
+  params,
+}: {
+  params: { slug: string }
 }) {
-  const { slug } = await params
-  const post = await getPost(slug)
+  const resolvedParams = await Promise.resolve(params)
+  const post = await getPost(resolvedParams.slug)
 
   if (!post) {
     notFound()
   }
 
-  // 카테고리별 돌아갈 링크 결정
-  const backLink = `/category/${post.category}`
-  const backText = `← ${post.category}로 돌아가기`
-
   return (
     <>
       <Nav />
       <main className="min-h-screen bg-white">
-        {/* 헤더 섹션 - 제목과 요약 */}
-        <div className="border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-8 py-20">
-            <Link 
-              href={backLink}
-              className="text-sm text-gray-600 hover:text-gray-900 mb-8 inline-block font-medium"
-            >
-              {backText}
-            </Link>
-
-            <header className="mt-8">
-              <h1 className="text-6xl font-bold text-gray-900 leading-tight mb-8">
-                {post.title}
-              </h1>
-              
-              {post.excerpt && (
-                <p className="text-2xl text-gray-600 leading-relaxed mb-8">
-                  {post.excerpt}
-                </p>
+        <article className="max-w-3xl mx-auto px-4 sm:px-8 py-12 sm:py-20">
+          {/* 메타 정보 */}
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+              <span className="bg-gray-100 px-2 sm:px-3 py-1 rounded">
+                {post.category}
+              </span>
+              <time>
+                {new Date(post.created_at).toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </time>
+              {post.views && post.views > 0 && (
+                <>
+                  <span>•</span>
+                  <span>{post.views} views</span>
+                </>
               )}
-
-              <div className="flex items-center gap-4 text-sm">
-                <time className="font-medium text-gray-500">
-                  {new Date(post.created_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  }).toUpperCase()}
-                </time>
-                <span className="text-gray-300">•</span>
-                <span className="text-gray-500 uppercase text-xs tracking-wide">
-                  {post.category}
-                </span>
-              </div>
-            </header>
+            </div>
+            
+            <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 leading-tight">
+              {post.title}
+            </h1>
           </div>
-        </div>
 
-        {/* 본문 섹션 */}
-        <div className="max-w-3xl mx-auto px-8 py-16">
-          <article 
-            className="prose prose-lg max-w-none"
+          {/* 본문 */}
+          <div 
+            className="prose prose-sm sm:prose-lg max-w-none
+              prose-headings:font-bold
+              prose-h1:text-2xl sm:prose-h1:text-4xl
+              prose-h2:text-xl sm:prose-h2:text-3xl
+              prose-h3:text-lg sm:prose-h3:text-2xl
+              prose-p:text-gray-700 prose-p:leading-relaxed
+              prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+              prose-img:rounded-lg prose-img:mx-auto
+              prose-pre:bg-gray-900 prose-pre:text-gray-100
+              prose-code:text-sm prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+              break-words"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
-        </div>
+        </article>
       </main>
     </>
   )
