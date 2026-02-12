@@ -33,6 +33,10 @@ export default function AdminAboutPage() {
       .select('*')
       .single()
 
+    if (error) {
+      console.error('Load error:', error)
+    }
+
     if (data) {
       setContent(data.content || '')
       setProfileImageUrl(data.profile_image_url || '')
@@ -47,7 +51,7 @@ export default function AdminAboutPage() {
     const fileName = `profile.${fileExt}`
     const filePath = `${fileName}`
 
-    // 기존 프로필 이미지 삭제 (선택사항)
+    // 기존 이미지 삭제
     await supabase.storage
       .from('blog-images')
       .remove([filePath])
@@ -58,6 +62,7 @@ export default function AdminAboutPage() {
       .upload(filePath, file, { upsert: true })
 
     if (uploadError) {
+      console.error('Upload error:', uploadError)
       alert('이미지 업로드 실패: ' + uploadError.message)
       setUploading(false)
       return
@@ -81,20 +86,49 @@ export default function AdminAboutPage() {
   async function handleSave() {
     setSaving(true)
 
-    const { error } = await supabase
-      .from('about')
-      .update({ 
-        content,
-        profile_image_url: profileImageUrl,
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', (await supabase.from('about').select('id').single()).data?.id)
+    try {
+      // about 데이터 가져오기
+      const { data: aboutData, error: fetchError } = await supabase
+        .from('about')
+        .select('id')
+        .single()
 
-    if (error) {
-      alert('저장 실패: ' + error.message)
-    } else {
-      alert('저장되었습니다!')
-      router.push('/admin')
+      if (fetchError) {
+        console.error('Fetch error:', fetchError)
+        alert('데이터 조회 실패: ' + fetchError.message)
+        setSaving(false)
+        return
+      }
+
+      if (!aboutData) {
+        alert('about 데이터를 찾을 수 없습니다.')
+        setSaving(false)
+        return
+      }
+
+      console.log('Updating about with ID:', aboutData.id)
+      console.log('Profile image URL:', profileImageUrl)
+
+      // 업데이트
+      const { error: updateError } = await supabase
+        .from('about')
+        .update({ 
+          content: content,
+          profile_image_url: profileImageUrl
+        })
+        .eq('id', aboutData.id)
+
+      if (updateError) {
+        console.error('Update error:', updateError)
+        alert('저장 실패: ' + updateError.message)
+      } else {
+        console.log('Update successful!')
+        alert('저장되었습니다!')
+        router.push('/admin')
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err)
+      alert('예상치 못한 오류: ' + err)
     }
 
     setSaving(false)
