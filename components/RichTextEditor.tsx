@@ -475,15 +475,21 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }
 
-  const handleFontSizeChange = (size: string) => {
+  const handleFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const size = e.target.value
     if (!editor || !size) return
     // @ts-ignore
     editor.chain().focus().setFontSize(size).run()
+    // 즉시 포커스 복귀
+    setTimeout(() => editor.commands.focus(), 0)
   }
 
-  const handleFontFamilyChange = (font: string) => {
+  const handleFontFamilyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const font = e.target.value
     if (!editor || !font) return
     editor.chain().focus().setFontFamily(font).run()
+    // 즉시 포커스 복귀
+    setTimeout(() => editor.commands.focus(), 0)
   }
 
   const setLink = () => {
@@ -545,8 +551,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
   return (
     <div className={`border border-gray-300 rounded-lg ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
-      {/* 툴바 - 다중 줄 */}
-      <div className="border-b border-gray-300 p-2 bg-gray-50 overflow-auto">
+      {/* 툴바 - 고정 (sticky) */}
+      <div className="sticky top-0 z-20 border-b border-gray-300 p-2 bg-gray-50 overflow-auto shadow-sm">
         {/* 첫 번째 줄: 실행 취소, 글꼴, 크기 */}
         <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
           {/* 되돌리기/다시실행 */}
@@ -573,7 +579,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
           {/* 폰트 종류 */}
           <select
-            onChange={(e) => handleFontFamilyChange(e.target.value)}
+            onChange={handleFontFamilyChange}
             className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 cursor-pointer"
             defaultValue=""
           >
@@ -589,7 +595,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
           {/* 폰트 크기 - 짝수와 홀수 모두 */}
           <select
-            onChange={(e) => handleFontSizeChange(e.target.value)}
+            onChange={handleFontSizeChange}
             className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 cursor-pointer"
             defaultValue=""
           >
@@ -902,7 +908,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
       {/* 링크 입력 박스 */}
       {showLinkInput && (
-        <div className="border-b border-gray-300 p-3 bg-yellow-50">
+        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-yellow-50">
           <div className="flex gap-2">
             <input
               type="url"
@@ -943,7 +949,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
       {/* 링크 프리뷰 입력 박스 */}
       {showLinkPreviewInput && (
-        <div className="border-b border-gray-300 p-3 bg-blue-50">
+        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-blue-50">
           <div className="flex gap-2">
             <input
               type="url"
