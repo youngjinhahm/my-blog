@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import type { Post } from '../../../types/database'
 import Nav from '../../../components/Nav'
+import CommentSection from '../../../components/CommentSection'
 
 export const revalidate = 0
 
@@ -77,7 +78,7 @@ export default async function PostPage({
           </div>
 
           {/* 본문 */}
-          <div 
+          <div
             className="prose prose-base sm:prose-lg max-w-none
               prose-headings:font-bold
               prose-h1:text-xl sm:prose-h1:text-3xl
@@ -93,6 +94,8 @@ export default async function PostPage({
               break-words"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
+
+          <CommentSection postId={post.id} />
         </article>
       </main>
     </>
