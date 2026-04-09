@@ -20,6 +20,7 @@ export interface Comment {
   author_email: string
   content: string
   approved: boolean
+  password?: string
 }
 
 export interface About {
