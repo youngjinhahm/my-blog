@@ -36,19 +36,55 @@ const StyledTable = Table.extend({
   },
 })
 
-// Word의 Cell Shading 대응: 셀 배경색 속성
+// 셀 공통 속성 (배경색 + 4방향 개별 테두리)
+const cellExtraAttrs = () => ({
+  backgroundColor: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.backgroundColor || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.backgroundColor) return {}
+      return { style: `background-color: ${attributes.backgroundColor}` }
+    },
+  },
+  borderTop: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderTop || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.borderTop) return {}
+      return { style: `border-top: ${attributes.borderTop}` }
+    },
+  },
+  borderRight: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderRight || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.borderRight) return {}
+      return { style: `border-right: ${attributes.borderRight}` }
+    },
+  },
+  borderBottom: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderBottom || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.borderBottom) return {}
+      return { style: `border-bottom: ${attributes.borderBottom}` }
+    },
+  },
+  borderLeft: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderLeft || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.borderLeft) return {}
+      return { style: `border-left: ${attributes.borderLeft}` }
+    },
+  },
+})
+
 const StyledTableCell = TableCell.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: element => (element as HTMLElement).style.backgroundColor || null,
-        renderHTML: attributes => {
-          if (!attributes.backgroundColor) return {}
-          return { style: `background-color: ${attributes.backgroundColor}` }
-        },
-      },
+      ...cellExtraAttrs(),
     }
   },
 })
@@ -57,14 +93,7 @@ const StyledTableHeader = TableHeader.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: element => (element as HTMLElement).style.backgroundColor || null,
-        renderHTML: attributes => {
-          if (!attributes.backgroundColor) return {}
-          return { style: `background-color: ${attributes.backgroundColor}` }
-        },
-      },
+      ...cellExtraAttrs(),
     }
   },
 })
@@ -377,10 +406,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'tableDesign' | 'tableLayout'>('home')
-  const [tableRows, setTableRows] = useState(3)
-  const [tableCols, setTableCols] = useState(3)
+  const [showInsertGrid, setShowInsertGrid] = useState(false)
+  const [hoverRow, setHoverRow] = useState(0)
+  const [hoverCol, setHoverCol] = useState(0)
   const [showShadingMenu, setShowShadingMenu] = useState(false)
   const [showBordersMenu, setShowBordersMenu] = useState(false)
+  const [showLineWeightMenu, setShowLineWeightMenu] = useState(false)
+  const [showLineStyleMenu, setShowLineStyleMenu] = useState(false)
+  // Pen 상태 (선 굵기, 스타일, 색상)
+  const [penWidth, setPenWidth] = useState('1pt')
+  const [penStyle, setPenStyle] = useState<'solid'|'double'|'dashed'|'dotted'>('solid')
+  const [penColor, setPenColor] = useState('#374151')
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -441,14 +477,22 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         class: 'prose prose-sm sm:prose lg:prose-lg max-w-none focus:outline-none min-h-[26cm]',
       },
       handleKeyDown: (view, event) => {
+        // 표 안에서는 기본 Enter 동작 유지 (셀 내부 줄바꿈)
+        const { $from } = view.state.selection
+        let inTable = false
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'table') { inTable = true; break }
+        }
+        if (inTable) return false
+
         if (event.key === 'Enter' && !event.shiftKey) {
           const { state, dispatch } = view
           const { schema } = state
-          
+
           const br = schema.nodes.hardBreak.create()
           const tr = state.tr.replaceSelectionWith(br).scrollIntoView()
           dispatch(tr)
-          
+
           return true
         }
         
@@ -532,15 +576,6 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editor.chain().focus().updateAttributes('table', { class: [preset, ...nonPreset].join(' ') }).run()
   }
 
-  const setTableBorderMode = (mode: string) => {
-    if (!editor) return
-    const current: string = (editor.getAttributes('table').class as string) || ''
-    const parts = current.split(/\s+/).filter(c => c && !c.startsWith('borders-'))
-    if (mode !== 'default') parts.push(`borders-${mode}`)
-    editor.chain().focus().updateAttributes('table', { class: parts.join(' ') }).run()
-    setShowBordersMenu(false)
-  }
-
   const setCellShading = (color: string | null) => {
     if (!editor) return
     editor.chain().focus()
@@ -548,6 +583,106 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       .updateAttributes('tableHeader', { backgroundColor: color })
       .run()
     setShowShadingMenu(false)
+  }
+
+  // Pen 설정으로 CSS border 문자열 생성
+  const buildBorderValue = (): string => {
+    return `${penWidth} ${penStyle} ${penColor}`
+  }
+
+  // 선택된 표 전체에 per-edge 테두리 적용
+  const applyBorderToTable = (
+    target: 'all' | 'outside' | 'inside' | 'top' | 'bottom' | 'left' | 'right' | 'none'
+  ) => {
+    if (!editor) return
+    const { state } = editor
+    const { $from } = state.selection
+
+    // 표 노드와 위치 찾기
+    let tableNode: any = null
+    let tablePos = -1
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        tableNode = $from.node(d)
+        tablePos = $from.before(d)
+        break
+      }
+    }
+    if (!tableNode) {
+      alert('먼저 표 안을 클릭해주세요.')
+      return
+    }
+
+    // 행/열 데이터 수집 (절대 위치 포함)
+    const rows: Array<Array<{ pos: number; node: any }>> = []
+    let rowAbs = tablePos + 1
+    tableNode.forEach((rowNode: any) => {
+      const cells: Array<{ pos: number; node: any }> = []
+      let cellAbs = rowAbs + 1
+      rowNode.forEach((cellNode: any) => {
+        cells.push({ pos: cellAbs, node: cellNode })
+        cellAbs += cellNode.nodeSize
+      })
+      rows.push(cells)
+      rowAbs += rowNode.nodeSize
+    })
+
+    const totalRows = rows.length
+    if (totalRows === 0) return
+
+    const borderValue = target === 'none' ? null : buildBorderValue()
+
+    const tr = state.tr
+    rows.forEach((row, r) => {
+      row.forEach((cell, c) => {
+        const isTop = r === 0
+        const isBottom = r === totalRows - 1
+        const isLeft = c === 0
+        const isRight = c === row.length - 1
+
+        const attrs: any = { ...cell.node.attrs }
+        const setAll = (v: string | null) => {
+          attrs.borderTop = v; attrs.borderRight = v; attrs.borderBottom = v; attrs.borderLeft = v
+        }
+
+        if (target === 'all' || target === 'none') {
+          setAll(borderValue)
+        } else if (target === 'outside') {
+          if (isTop) attrs.borderTop = borderValue
+          if (isBottom) attrs.borderBottom = borderValue
+          if (isLeft) attrs.borderLeft = borderValue
+          if (isRight) attrs.borderRight = borderValue
+        } else if (target === 'inside') {
+          if (!isTop) attrs.borderTop = borderValue
+          if (!isBottom) attrs.borderBottom = borderValue
+          if (!isLeft) attrs.borderLeft = borderValue
+          if (!isRight) attrs.borderRight = borderValue
+        } else if (target === 'top' && isTop) {
+          attrs.borderTop = borderValue
+        } else if (target === 'bottom' && isBottom) {
+          attrs.borderBottom = borderValue
+        } else if (target === 'left' && isLeft) {
+          attrs.borderLeft = borderValue
+        } else if (target === 'right' && isRight) {
+          attrs.borderRight = borderValue
+        }
+
+        tr.setNodeMarkup(cell.pos, undefined, attrs)
+      })
+    })
+
+    editor.view.dispatch(tr)
+    editor.commands.focus()
+    setShowBordersMenu(false)
+  }
+
+  // 그리드 피커에서 표 삽입
+  const insertTableFromGrid = (rows: number, cols: number) => {
+    if (!editor) return
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+    setShowInsertGrid(false)
+    setHoverRow(0)
+    setHoverCol(0)
   }
 
   const uploadImage = async (file: File) => {
@@ -788,24 +923,65 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {/* ========== 삽입 탭 ========== */}
           {activeTab === 'insert' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
-              {/* 표 삽입 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
-                <div className="flex items-center gap-2 flex-1">
-                  <div className="text-center">
-                    <div className="text-2xl">⊞</div>
-                    <div className="flex items-center gap-1 text-[10px] text-gray-600">
-                      <span>행</span>
-                      <input type="number" min={1} max={50} value={tableRows} onChange={(e) => setTableRows(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))} className="w-10 px-1 text-xs border border-gray-300 rounded" />
-                      <span>열</span>
-                      <input type="number" min={1} max={20} value={tableCols} onChange={(e) => setTableCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))} className="w-10 px-1 text-xs border border-gray-300 rounded" />
-                    </div>
-                    <div className="flex gap-1 mt-1">
-                      <button type="button" onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()} className="px-2 py-0.5 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700">머리글 포함</button>
-                      <button type="button" onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: false }).run()} className="px-2 py-0.5 text-[10px] bg-gray-200 text-gray-800 rounded hover:bg-gray-300">없음</button>
-                    </div>
-                  </div>
+              {/* 표 삽입 (그리드 피커) */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex items-start flex-1 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setShowInsertGrid(!showInsertGrid); editor.commands.focus() }}
+                    className="flex flex-col items-center px-3 py-1 hover:bg-blue-100 rounded"
+                    title="표 삽입"
+                  >
+                    <span className="text-3xl leading-none">⊞</span>
+                    <span className="text-[10px] text-gray-700 mt-1">표 ▾</span>
+                  </button>
                 </div>
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표</div>
+                {showInsertGrid && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[260px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">
+                      {hoverRow > 0 && hoverCol > 0 ? `${hoverRow} × ${hoverCol} 표` : '표 크기를 선택하세요'}
+                    </div>
+                    <div
+                      className="inline-block"
+                      onMouseLeave={() => { setHoverRow(0); setHoverCol(0) }}
+                    >
+                      {Array.from({ length: 8 }).map((_, r) => (
+                        <div key={r} className="flex">
+                          {Array.from({ length: 10 }).map((_, c) => {
+                            const active = r < hoverRow && c < hoverCol
+                            return (
+                              <div
+                                key={c}
+                                onMouseEnter={() => { setHoverRow(r + 1); setHoverCol(c + 1) }}
+                                onClick={() => insertTableFromGrid(r + 1, c + 1)}
+                                className={`w-5 h-5 m-[1px] border cursor-pointer ${
+                                  active ? 'bg-blue-400 border-blue-600' : 'bg-white border-gray-300 hover:border-blue-400'
+                                }`}
+                              />
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-gray-200 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => insertTableFromGrid(3, 3)}
+                        className="flex-1 px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        3×3 기본 삽입
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowInsertGrid(false); setHoverRow(0); setHoverCol(0) }}
+                        className="px-2 py-1 text-[10px] bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 그림/미디어 */}
@@ -924,28 +1100,112 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                 )}
               </div>
 
-              {/* 테두리 (Borders) */}
+              {/* 선 스타일 (Line Style) */}
+              <div className="flex flex-col items-center px-2 border-r border-gray-300 relative">
+                <div className="flex-1 flex flex-col items-stretch gap-1 pt-1 min-w-[110px]">
+                  <button
+                    type="button"
+                    onClick={() => { setShowLineStyleMenu(!showLineStyleMenu); setShowLineWeightMenu(false) }}
+                    className="flex items-center justify-between px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-blue-50"
+                    title="선 스타일"
+                  >
+                    <span>
+                      {penStyle === 'solid' && '───── 단일'}
+                      {penStyle === 'double' && '═════ 이중'}
+                      {penStyle === 'dashed' && '- - - 점선'}
+                      {penStyle === 'dotted' && '····· 도트'}
+                    </span>
+                    <span>▾</span>
+                  </button>
+                  {showLineStyleMenu && (
+                    <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-1 w-40">
+                      {[
+                        { v: 'solid', label: '───── 단일선' },
+                        { v: 'double', label: '═════ 이중선' },
+                        { v: 'dashed', label: '- - - - 파선' },
+                        { v: 'dotted', label: '· · · · 점선' },
+                      ].map(s => (
+                        <button
+                          key={s.v}
+                          type="button"
+                          onClick={() => { setPenStyle(s.v as any); setShowLineStyleMenu(false) }}
+                          className={`w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded ${penStyle === s.v ? 'bg-blue-100' : ''}`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setShowLineWeightMenu(!showLineWeightMenu); setShowLineStyleMenu(false) }}
+                    className="flex items-center justify-between px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-blue-50"
+                    title="선 굵기"
+                  >
+                    <span>굵기: {penWidth}</span>
+                    <span>▾</span>
+                  </button>
+                  {showLineWeightMenu && (
+                    <div className="absolute top-full left-0 mt-[52px] z-30 bg-white border border-gray-300 rounded shadow-lg p-1 w-40">
+                      {['0.5pt', '0.75pt', '1pt', '1.5pt', '2.25pt', '3pt', '4.5pt', '6pt'].map(w => (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => { setPenWidth(w); setShowLineWeightMenu(false) }}
+                          className={`w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded ${penWidth === w ? 'bg-blue-100' : ''}`}
+                        >
+                          <div style={{ borderTop: `${w} solid #111` }} className="my-1"></div>
+                          <span className="text-[10px] text-gray-600">{w}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <label className="flex items-center justify-between px-2 py-1 text-[10px] bg-white border border-gray-300 rounded cursor-pointer hover:bg-blue-50">
+                    <span>펜 색</span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block w-4 h-4 border border-gray-400" style={{ backgroundColor: penColor }}></span>
+                      <input
+                        type="color"
+                        value={penColor}
+                        onChange={(e) => setPenColor(e.target.value)}
+                        className="w-0 h-0 opacity-0"
+                      />
+                    </span>
+                  </label>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">테두리 스타일</div>
+              </div>
+
+              {/* 테두리 (Borders) 드롭다운 */}
               <div className="flex flex-col items-center px-3 relative">
                 <div className="flex-1 flex items-start pt-1">
                   <button type="button" onClick={() => setShowBordersMenu(!showBordersMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="테두리">
-                    <span className="text-2xl">⊟</span>
+                    <span className="text-2xl">⊞</span>
                     <span className="text-[10px] text-gray-700">테두리 ▾</span>
                   </button>
                 </div>
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">테두리</div>
                 {showBordersMenu && (
-                  <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-44">
+                  <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-52">
+                    <div className="text-[10px] text-gray-500 mb-1 px-1">
+                      현재 펜: {penWidth} {penStyle} <span className="inline-block w-3 h-3 align-middle border border-gray-400" style={{ backgroundColor: penColor }}></span>
+                    </div>
                     {[
-                      { mode: 'default', label: '기본' },
-                      { mode: 'all', label: '모든 테두리' },
-                      { mode: 'outside', label: '바깥쪽 테두리' },
-                      { mode: 'inside', label: '안쪽 테두리' },
-                      { mode: 'top', label: '위쪽 테두리' },
-                      { mode: 'bottom', label: '아래쪽 테두리' },
-                      { mode: 'thick', label: '굵은 테두리' },
-                      { mode: 'none', label: '테두리 없음' },
+                      { mode: 'all', label: '⊞ 모든 테두리' },
+                      { mode: 'outside', label: '▭ 바깥쪽 테두리' },
+                      { mode: 'inside', label: '田 안쪽 테두리' },
+                      { mode: 'top', label: '▔ 위쪽 테두리' },
+                      { mode: 'bottom', label: '▁ 아래쪽 테두리' },
+                      { mode: 'left', label: '▏ 왼쪽 테두리' },
+                      { mode: 'right', label: '▕ 오른쪽 테두리' },
+                      { mode: 'none', label: '∅ 테두리 없음' },
                     ].map(b => (
-                      <button key={b.mode} type="button" onClick={() => setTableBorderMode(b.mode)} className="w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded">
+                      <button
+                        key={b.mode}
+                        type="button"
+                        onClick={() => applyBorderToTable(b.mode as any)}
+                        className="w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded"
+                      >
                         {b.label}
                       </button>
                     ))}
@@ -1312,24 +1572,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           background-color: #f9fafb;
         }
 
-        /* ============ 테두리 모드 (Borders dropdown) ============ */
-        .ProseMirror table.borders-all td,
-        .ProseMirror table.borders-all th { border: 1px solid #374151 !important; }
-        .ProseMirror table.borders-outside { border: 2px solid #374151; }
-        .ProseMirror table.borders-outside td,
-        .ProseMirror table.borders-outside th { border: none !important; }
-        .ProseMirror table.borders-inside td,
-        .ProseMirror table.borders-inside th { border: 1px solid #9ca3af !important; }
-        .ProseMirror table.borders-inside { border: none; }
-        .ProseMirror table.borders-top tr:first-child td,
-        .ProseMirror table.borders-top tr:first-child th { border-top: 2px solid #374151 !important; }
-        .ProseMirror table.borders-bottom tr:last-child td,
-        .ProseMirror table.borders-bottom tr:last-child th { border-bottom: 2px solid #374151 !important; }
-        .ProseMirror table.borders-thick td,
-        .ProseMirror table.borders-thick th { border: 2px solid #111827 !important; }
-        .ProseMirror table.borders-none td,
-        .ProseMirror table.borders-none th { border: none !important; }
-        .ProseMirror table.borders-none { border: none !important; }
+        /* 인라인 per-edge 테두리가 프리셋보다 우선 적용되도록 !important 제거 */
 
         /* ============ 미리보기 표 (갤러리 섬네일) ============ */
         .preview-table {
