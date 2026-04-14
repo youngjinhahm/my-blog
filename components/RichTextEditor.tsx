@@ -18,6 +18,56 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
 import { Mark, Node } from '@tiptap/core'
+
+// Word의 Table Styles 대응: 표에 스타일 프리셋 class 부여
+const StyledTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      class: {
+        default: 'tbl-grid',
+        parseHTML: element => element.getAttribute('class') || 'tbl-grid',
+        renderHTML: attributes => {
+          if (!attributes.class) return {}
+          return { class: attributes.class }
+        },
+      },
+    }
+  },
+})
+
+// Word의 Cell Shading 대응: 셀 배경색 속성
+const StyledTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: element => (element as HTMLElement).style.backgroundColor || null,
+        renderHTML: attributes => {
+          if (!attributes.backgroundColor) return {}
+          return { style: `background-color: ${attributes.backgroundColor}` }
+        },
+      },
+    }
+  },
+})
+
+const StyledTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: element => (element as HTMLElement).style.backgroundColor || null,
+        renderHTML: attributes => {
+          if (!attributes.backgroundColor) return {}
+          return { style: `background-color: ${attributes.backgroundColor}` }
+        },
+      },
+    }
+  },
+})
 import { useRef, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -326,6 +376,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [fetchingPreview, setFetchingPreview] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [wordCount, setWordCount] = useState(0)
+  const [showTableMenu, setShowTableMenu] = useState(false)
+  const [tableRows, setTableRows] = useState(3)
+  const [tableCols, setTableCols] = useState(3)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -361,12 +414,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         allowBase64: true,
       }),
       LinkPreview,
-      Table.configure({
+      StyledTable.configure({
         resizable: true,
       }),
       TableRow,
-      TableHeader,
-      TableCell,
+      StyledTableHeader,
+      StyledTableCell,
       Placeholder.configure({
         placeholder: '글 내용을 작성하세요...',
       }),
@@ -383,7 +436,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] px-4 py-2',
+        class: 'prose prose-sm sm:prose lg:prose-lg max-w-none focus:outline-none min-h-[26cm]',
       },
       handleKeyDown: (view, event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -854,14 +907,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
           <div className="w-px h-8 bg-gray-300 mx-1"></div>
 
-          {/* 표 - 1x1 기본값 */}
+          {/* 표 메뉴 (Word Table Design 수준) */}
           <button
             type="button"
-            onClick={() => editor.chain().focus().insertTable({ rows: 1, cols: 1, withHeaderRow: false }).run()}
-            className="px-3 py-1 rounded hover:bg-gray-100 border border-transparent"
-            title="표 삽입 (1x1)"
+            onClick={() => setShowTableMenu(!showTableMenu)}
+            className={`px-3 py-1 rounded border ${showTableMenu ? 'bg-blue-100 border-blue-300' : 'border-transparent hover:bg-gray-100'}`}
+            title="표 삽입 및 디자인"
           >
-            ⊞ 표
+            ⊞ 표 ▾
           </button>
 
           <div className="w-px h-8 bg-gray-300 mx-1"></div>
@@ -988,9 +1041,137 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         </div>
       )}
 
-      {/* 에디터 */}
-      <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto' : ''}>
-        <EditorContent editor={editor} />
+      {/* 표 디자인 메뉴 (Word 수준) */}
+      {showTableMenu && (
+        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-indigo-50 space-y-3">
+          {/* 표 삽입 */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700">표 삽입:</span>
+            <label className="text-xs text-gray-600">행</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={tableRows}
+              onChange={(e) => setTableRows(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+              className="w-14 px-2 py-1 text-xs border border-gray-300 rounded"
+            />
+            <label className="text-xs text-gray-600">열</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={tableCols}
+              onChange={(e) => setTableCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+              className="w-14 px-2 py-1 text-xs border border-gray-300 rounded"
+            />
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()}
+              className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            >
+              + 표 만들기 (머리글 포함)
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: false }).run()}
+              className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            >
+              + 표 만들기 (머리글 없음)
+            </button>
+          </div>
+
+          {/* 행/열 편집 */}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs font-semibold text-gray-700 mr-1">행/열:</span>
+            <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">↑ 행 위</button>
+            <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">↓ 행 아래</button>
+            <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-red-50 text-red-600">행 삭제</button>
+            <div className="w-px h-6 bg-gray-300 mx-1"></div>
+            <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">← 열 왼쪽</button>
+            <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">→ 열 오른쪽</button>
+            <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-red-50 text-red-600">열 삭제</button>
+          </div>
+
+          {/* 셀 병합/분할 / 머리글 / 삭제 */}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs font-semibold text-gray-700 mr-1">셀:</span>
+            <button type="button" onClick={() => editor.chain().focus().mergeCells().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">셀 병합</button>
+            <button type="button" onClick={() => editor.chain().focus().splitCell().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">셀 분할</button>
+            <button type="button" onClick={() => editor.chain().focus().mergeOrSplit().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">병합/분할</button>
+            <div className="w-px h-6 bg-gray-300 mx-1"></div>
+            <button type="button" onClick={() => editor.chain().focus().toggleHeaderRow().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 행</button>
+            <button type="button" onClick={() => editor.chain().focus().toggleHeaderColumn().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 열</button>
+            <button type="button" onClick={() => editor.chain().focus().toggleHeaderCell().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 셀</button>
+            <div className="w-px h-6 bg-gray-300 mx-1"></div>
+            <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="px-2 py-1 text-xs border border-red-300 rounded bg-white text-red-600 hover:bg-red-50">표 삭제</button>
+          </div>
+
+          {/* 셀 배경색 (음영) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700">셀 음영:</span>
+            {['#ffffff','#fef3c7','#fecaca','#bbf7d0','#bfdbfe','#e9d5ff','#fed7aa','#e5e7eb','#374151'].map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: c }).updateAttributes('tableHeader', { backgroundColor: c }).run()}
+                style={{ backgroundColor: c }}
+                className="w-6 h-6 border border-gray-400 rounded cursor-pointer hover:scale-110 transition"
+                title={c}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run()}
+              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100"
+            >
+              음영 지우기
+            </button>
+          </div>
+
+          {/* 표 스타일 (Word Table Styles) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700">표 스타일:</span>
+            {[
+              { cls: 'tbl-grid', label: '격자' },
+              { cls: 'tbl-plain', label: '단순' },
+              { cls: 'tbl-striped', label: '줄무늬' },
+              { cls: 'tbl-header', label: '머리글 강조' },
+              { cls: 'tbl-colorful', label: '컬러풀' },
+              { cls: 'tbl-minimal', label: '미니멀' },
+              { cls: 'tbl-dark', label: '다크' },
+            ].map(s => (
+              <button
+                key={s.cls}
+                type="button"
+                onClick={() => editor.chain().focus().updateAttributes('table', { class: s.cls }).run()}
+                className="px-3 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-indigo-100"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs text-gray-500">
+            💡 팁: 셀 내부에 커서를 두고 위 버튼들을 누르세요. 행/열을 드래그해 크기를 조절할 수 있습니다.
+          </p>
+        </div>
+      )}
+
+      {/* 에디터 (A4 narrow margin 1.27cm 레이아웃) */}
+      <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-100 p-4' : 'bg-gray-100 p-4'}>
+        <div
+          className="mx-auto bg-white shadow-md"
+          style={{
+            width: '21cm',
+            maxWidth: '100%',
+            minHeight: '29.7cm',
+            padding: '1.27cm',
+            boxSizing: 'border-box',
+          }}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
       
       {/* 사용 안내 */}
@@ -1024,20 +1205,117 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: block;
           margin: 0;
         }
+        /* 기본 표 스타일 */
         .ProseMirror table {
           border-collapse: collapse;
           margin: 16px 0;
           width: 100%;
+          table-layout: fixed;
         }
         .ProseMirror table td,
         .ProseMirror table th {
-          border: 1px solid #d1d5db;
-          padding: 8px;
-          min-width: 100px;
+          padding: 8px 10px;
+          min-width: 60px;
+          vertical-align: top;
+          position: relative;
         }
-        .ProseMirror table th {
+        .ProseMirror table .selectedCell::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: rgba(59, 130, 246, 0.15);
+          pointer-events: none;
+          z-index: 2;
+        }
+        .ProseMirror table .column-resize-handle {
+          position: absolute;
+          right: -2px;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: #3b82f6;
+          pointer-events: none;
+        }
+
+        /* Word Table Styles 프리셋 */
+        .ProseMirror table.tbl-grid td,
+        .ProseMirror table.tbl-grid th {
+          border: 1px solid #9ca3af;
+        }
+        .ProseMirror table.tbl-grid th {
           background-color: #f3f4f6;
-          font-weight: 600;
+          font-weight: 700;
+        }
+
+        .ProseMirror table.tbl-plain td,
+        .ProseMirror table.tbl-plain th {
+          border: 1px solid #e5e7eb;
+        }
+        .ProseMirror table.tbl-plain th {
+          background-color: transparent;
+          font-weight: 700;
+          border-bottom: 2px solid #6b7280;
+        }
+
+        .ProseMirror table.tbl-striped td,
+        .ProseMirror table.tbl-striped th {
+          border: 1px solid #e5e7eb;
+        }
+        .ProseMirror table.tbl-striped th {
+          background-color: #4b5563;
+          color: #ffffff;
+          font-weight: 700;
+        }
+        .ProseMirror table.tbl-striped tr:nth-child(even) td {
+          background-color: #f9fafb;
+        }
+
+        .ProseMirror table.tbl-header td,
+        .ProseMirror table.tbl-header th {
+          border: 1px solid #d1d5db;
+        }
+        .ProseMirror table.tbl-header th {
+          background-color: #1e40af;
+          color: #ffffff;
+          font-weight: 700;
+          border: 1px solid #1e3a8a;
+        }
+
+        .ProseMirror table.tbl-colorful td,
+        .ProseMirror table.tbl-colorful th {
+          border: 1px solid #a78bfa;
+        }
+        .ProseMirror table.tbl-colorful th {
+          background-color: #7c3aed;
+          color: #ffffff;
+          font-weight: 700;
+        }
+        .ProseMirror table.tbl-colorful tr:nth-child(even) td {
+          background-color: #f5f3ff;
+        }
+
+        .ProseMirror table.tbl-minimal td,
+        .ProseMirror table.tbl-minimal th {
+          border: none;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .ProseMirror table.tbl-minimal th {
+          background-color: transparent;
+          font-weight: 700;
+          border-bottom: 2px solid #111827;
+          text-align: left;
+        }
+
+        .ProseMirror table.tbl-dark td,
+        .ProseMirror table.tbl-dark th {
+          border: 1px solid #374151;
+          background-color: #1f2937;
+          color: #f3f4f6;
+        }
+        .ProseMirror table.tbl-dark th {
+          background-color: #111827;
+          color: #ffffff;
+          font-weight: 700;
         }
         .ProseMirror blockquote {
           border-left: 4px solid #d1d5db;

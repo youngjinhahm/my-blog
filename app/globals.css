@@ -78,3 +78,45 @@
 .ProseMirror [style*="lineHeight"] {
   line-height: var(--lineHeight) !important;
 }
+
+/* 글 본문 표 스타일 (Word Table Styles와 매칭, 포스트 뷰) */
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  table-layout: fixed;
+}
+.prose table td,
+.prose table th {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+.prose table.tbl-grid td,
+.prose table.tbl-grid th { border: 1px solid #9ca3af; }
+.prose table.tbl-grid th { background-color: #f3f4f6; font-weight: 700; }
+
+.prose table.tbl-plain td,
+.prose table.tbl-plain th { border: 1px solid #e5e7eb; }
+.prose table.tbl-plain th { font-weight: 700; border-bottom: 2px solid #6b7280; }
+
+.prose table.tbl-striped td,
+.prose table.tbl-striped th { border: 1px solid #e5e7eb; }
+.prose table.tbl-striped th { background-color: #4b5563; color: #fff; font-weight: 700; }
+.prose table.tbl-striped tr:nth-child(even) td { background-color: #f9fafb; }
+
+.prose table.tbl-header td,
+.prose table.tbl-header th { border: 1px solid #d1d5db; }
+.prose table.tbl-header th { background-color: #1e40af; color: #fff; font-weight: 700; }
+
+.prose table.tbl-colorful td,
+.prose table.tbl-colorful th { border: 1px solid #a78bfa; }
+.prose table.tbl-colorful th { background-color: #7c3aed; color: #fff; font-weight: 700; }
+.prose table.tbl-colorful tr:nth-child(even) td { background-color: #f5f3ff; }
+
+.prose table.tbl-minimal td,
+.prose table.tbl-minimal th { border: none; border-bottom: 1px solid #e5e7eb; }
+.prose table.tbl-minimal th { font-weight: 700; border-bottom: 2px solid #111827; text-align: left; }
+
+.prose table.tbl-dark td,
+.prose table.tbl-dark th { border: 1px solid #374151; background-color: #1f2937; color: #f3f4f6; }
+.prose table.tbl-dark th { background-color: #111827; color: #fff; font-weight: 700; }

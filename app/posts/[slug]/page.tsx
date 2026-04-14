@@ -41,8 +41,18 @@ export default async function PostPage({
   return (
     <>
       <Nav />
-      <main className="min-h-screen bg-white">
-        <article className="max-w-5xl mx-auto px-4 sm:px-12 py-6 sm:py-10">
+      <main className="min-h-screen bg-gray-100 py-6 sm:py-10">
+        {/* A4 용지 (210mm × 297mm), narrow margin 1.27cm */}
+        <article
+          className="mx-auto bg-white shadow-md"
+          style={{
+            width: '21cm',
+            maxWidth: '100%',
+            minHeight: '29.7cm',
+            padding: '1.27cm',
+            boxSizing: 'border-box',
+          }}
+        >
           {/* 메타 정보 */}
           <div className="mb-4 pb-4 border-b border-gray-200">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500 mb-3">

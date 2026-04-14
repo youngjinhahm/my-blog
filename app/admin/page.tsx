@@ -59,6 +59,62 @@ export default function AdminPage() {
     router.push('/login')
   }
 
+  function handleExportPDF() {
+    const w = window.open('', '_blank', 'width=900,height=1000')
+    if (!w) {
+      alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.')
+      return
+    }
+    const title = formData.title || '제목 없음'
+    const category = formData.category || ''
+    const date = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+    w.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>${title}</title>
+<style>
+  @page { size: A4; margin: 1.27cm; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    color: #1f2937;
+    line-height: 1.7;
+    font-size: 11pt;
+  }
+  .meta { color: #6b7280; font-size: 10pt; margin-bottom: 8px; }
+  h1.post-title { font-size: 22pt; font-weight: 700; margin: 0 0 16px; color: #111827; }
+  .excerpt { color: #6b7280; font-size: 12pt; margin: 0 0 16px; }
+  hr.sep { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0 20px; }
+  .content h1 { font-size: 18pt; margin: 18px 0 10px; }
+  .content h2 { font-size: 15pt; margin: 16px 0 8px; }
+  .content h3 { font-size: 13pt; margin: 14px 0 6px; }
+  .content p { margin: 8px 0; }
+  .content img { max-width: 100%; height: auto; }
+  .content table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .content table td, .content table th { border: 1px solid #9ca3af; padding: 6px 8px; }
+  .content table th { background: #f3f4f6; }
+  .content blockquote { border-left: 4px solid #d1d5db; padding-left: 12px; color: #6b7280; margin: 12px 0; }
+  .content pre { background: #1f2937; color: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; font-size: 9pt; }
+  .content code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 9pt; }
+</style>
+</head>
+<body>
+  <div class="meta">${category} · ${date}</div>
+  <h1 class="post-title">${title}</h1>
+  ${formData.excerpt ? `<p class="excerpt">${formData.excerpt}</p>` : ''}
+  <hr class="sep" />
+  <div class="content">${formData.content || ''}</div>
+  <script>
+    window.addEventListener('load', function(){
+      setTimeout(function(){ window.focus(); window.print(); }, 300);
+    });
+  </script>
+</body>
+</html>`)
+    w.document.close()
+  }
+
   function handleNewPost() {
     setEditingPost(null)
     setFormData({
@@ -235,6 +291,7 @@ export default function AdminPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="경제">경제</option>
+                  <option value="투자">투자</option>
                   <option value="책">책</option>
                   <option value="영화">영화</option>
                   <option value="세상">세상</option>
@@ -277,12 +334,20 @@ export default function AdminPage() {
                 </label>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <button
                   type="submit"
                   className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
                 >
                   {editingPost ? '수정 완료' : '작성 완료'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition font-medium"
+                  title="A4 narrow margin(1.27cm)으로 PDF 저장"
+                >
+                  📄 PDF로 저장
                 </button>
                 <button
                   type="button"

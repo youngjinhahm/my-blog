@@ -38,8 +38,19 @@ export default function Nav() {
             >
               경제
             </Link>
-            
-            <Link 
+
+            <Link
+              href="/category/투자"
+              className={`text-xs sm:text-sm font-medium transition ${
+                pathname.includes('/category/투자')
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              투자
+            </Link>
+
+            <Link
               href="/category/책"
               className={`text-xs sm:text-sm font-medium transition ${
                 pathname.includes('/category/책') 

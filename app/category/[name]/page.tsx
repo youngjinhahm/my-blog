@@ -7,7 +7,7 @@ import type { Post } from '../../../types/database'
 import Nav from '../../../components/Nav'
 import { notFound } from 'next/navigation'
 
-const validCategories = ['경제', '책', '영화', '세상'] as const
+const validCategories = ['경제', '투자', '책', '영화', '세상'] as const
 
 export default function CategoryPage({ 
   params 
