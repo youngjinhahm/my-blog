@@ -376,9 +376,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [fetchingPreview, setFetchingPreview] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [wordCount, setWordCount] = useState(0)
-  const [showTableMenu, setShowTableMenu] = useState(false)
+  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'tableDesign' | 'tableLayout'>('home')
   const [tableRows, setTableRows] = useState(3)
   const [tableCols, setTableCols] = useState(3)
+  const [showShadingMenu, setShowShadingMenu] = useState(false)
+  const [showBordersMenu, setShowBordersMenu] = useState(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -494,6 +496,60 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }, [editor])
 
+  // 현재 커서가 표 안에 있는지 감지 → 컨텍스트 탭 자동 활성화
+  const isInTable = editor?.isActive('table') ?? false
+  useEffect(() => {
+    if (isInTable && activeTab !== 'tableDesign' && activeTab !== 'tableLayout') {
+      setActiveTab('tableDesign')
+    }
+    if (!isInTable && (activeTab === 'tableDesign' || activeTab === 'tableLayout')) {
+      setActiveTab('home')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInTable])
+
+  // 표 클래스 토글 (스타일 옵션)
+  const toggleTableClass = (cls: string) => {
+    if (!editor) return
+    const current: string = (editor.getAttributes('table').class as string) || 'tbl-grid'
+    const parts = current.split(/\s+/).filter(Boolean)
+    const idx = parts.indexOf(cls)
+    if (idx >= 0) parts.splice(idx, 1)
+    else parts.push(cls)
+    editor.chain().focus().updateAttributes('table', { class: parts.join(' ') }).run()
+  }
+
+  const hasTableClass = (cls: string): boolean => {
+    if (!editor) return false
+    const current: string = (editor.getAttributes('table').class as string) || ''
+    return current.split(/\s+/).includes(cls)
+  }
+
+  const setTableStyle = (preset: string) => {
+    if (!editor) return
+    const current: string = (editor.getAttributes('table').class as string) || ''
+    const nonPreset = current.split(/\s+/).filter(c => c && !c.startsWith('tbl-'))
+    editor.chain().focus().updateAttributes('table', { class: [preset, ...nonPreset].join(' ') }).run()
+  }
+
+  const setTableBorderMode = (mode: string) => {
+    if (!editor) return
+    const current: string = (editor.getAttributes('table').class as string) || ''
+    const parts = current.split(/\s+/).filter(c => c && !c.startsWith('borders-'))
+    if (mode !== 'default') parts.push(`borders-${mode}`)
+    editor.chain().focus().updateAttributes('table', { class: parts.join(' ') }).run()
+    setShowBordersMenu(false)
+  }
+
+  const setCellShading = (color: string | null) => {
+    if (!editor) return
+    editor.chain().focus()
+      .updateAttributes('tableCell', { backgroundColor: color })
+      .updateAttributes('tableHeader', { backgroundColor: color })
+      .run()
+    setShowShadingMenu(false)
+  }
+
   const uploadImage = async (file: File) => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
@@ -604,562 +660,427 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
   return (
     <div className={`border border-gray-300 rounded-lg ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
-      {/* 툴바 - 고정 (sticky) */}
-      <div className="sticky top-0 z-20 border-b border-gray-300 p-2 bg-gray-50 overflow-auto shadow-sm">
-        {/* 첫 번째 줄: 실행 취소, 글꼴, 크기 */}
-        <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
-          {/* 되돌리기/다시실행 */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().undo().run()}
-            disabled={!editor.can().undo()}
-            className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-30"
-            title="실행 취소 (Ctrl+Z)"
-          >
-            ↶
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().redo().run()}
-            disabled={!editor.can().redo()}
-            className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-30"
-            title="다시 실행 (Ctrl+Y)"
-          >
-            ↷
-          </button>
-
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-          {/* 폰트 종류 */}
-          <select
-            onChange={handleFontFamilyChange}
-            className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 cursor-pointer"
-            defaultValue=""
-          >
-            <option value="">기본 폰트</option>
-            <option value="'Noto Sans KR', sans-serif">Noto Sans</option>
-            <option value="Arial">Arial</option>
-            <option value="'Times New Roman'">Times New Roman</option>
-            <option value="'Courier New'">Courier New</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Verdana">Verdana</option>
-            <option value="'Comic Sans MS'">Comic Sans MS</option>
-          </select>
-
-          {/* 폰트 크기 - 짝수와 홀수 모두 */}
-          <select
-            onChange={handleFontSizeChange}
-            className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 cursor-pointer"
-            defaultValue=""
-          >
-            <option value="" disabled>크기</option>
-            <option value="8pt">8</option>
-            <option value="9pt">9</option>
-            <option value="10pt">10</option>
-            <option value="11pt">11</option>
-            <option value="12pt">12</option>
-            <option value="13pt">13</option>
-            <option value="14pt">14</option>
-            <option value="15pt">15</option>
-            <option value="16pt">16</option>
-            <option value="17pt">17</option>
-            <option value="18pt">18</option>
-            <option value="19pt">19</option>
-            <option value="20pt">20</option>
-            <option value="21pt">21</option>
-            <option value="22pt">22</option>
-            <option value="24pt">24</option>
-            <option value="26pt">26</option>
-            <option value="28pt">28</option>
-            <option value="30pt">30</option>
-            <option value="32pt">32</option>
-            <option value="36pt">36</option>
-            <option value="40pt">40</option>
-            <option value="48pt">48</option>
-            <option value="60pt">60</option>
-            <option value="72pt">72</option>
-          </select>
-
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-          {/* 전체화면 */}
+      {/* ===== Word 스타일 리본 ===== */}
+      <div className="sticky top-0 z-20 bg-gradient-to-b from-gray-50 to-gray-100 border-b border-gray-300 shadow-sm">
+        {/* 탭 바 */}
+        <div className="flex items-center px-2 pt-1 border-b border-gray-200 bg-white">
+          {[
+            { id: 'home', label: '홈' },
+            { id: 'insert', label: '삽입' },
+            ...(isInTable ? [
+              { id: 'tableDesign', label: '표 디자인', contextual: true },
+              { id: 'tableLayout', label: '표 레이아웃', contextual: true },
+            ] : []),
+          ].map((tab: any) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-1.5 text-xs font-medium rounded-t transition border-b-2 ${
+                activeTab === tab.id
+                  ? (tab.contextual ? 'border-orange-500 text-orange-700 bg-orange-50' : 'border-blue-600 text-blue-700 bg-blue-50')
+                  : (tab.contextual ? 'border-transparent text-orange-600 hover:bg-orange-50' : 'border-transparent text-gray-600 hover:bg-gray-100')
+              }`}
+            >
+              {tab.contextual && <span className="text-[9px] block -mb-1 opacity-70">표 도구</span>}
+              {tab.label}
+            </button>
+          ))}
+          <div className="flex-1"></div>
           <button
             type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+            className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
             title="전체화면"
           >
-            {isFullscreen ? '⊟' : '⊠'}
+            {isFullscreen ? '⊟ 창모드' : '⊠ 전체화면'}
           </button>
-
-          {/* 단어 수 */}
-          <div className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded bg-white">
-            {wordCount} 단어
-          </div>
+          <div className="px-2 py-1 text-[10px] text-gray-500">{wordCount} 단어</div>
         </div>
 
-        {/* 두 번째 줄: 기본 서식 */}
-        <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('bold') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="굵게 (Ctrl+B)"
-          >
-            <strong>B</strong>
-          </button>
+        {/* 리본 본문 */}
+        <div className="px-2 py-2 overflow-x-auto">
+          {/* ========== 홈 탭 ========== */}
+          {activeTab === 'home' && (
+            <div className="flex items-stretch gap-0 min-h-[92px]">
+              {/* 클립보드 그룹 */}
+              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+                <div className="flex items-start gap-1 flex-1">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="실행 취소 (Ctrl+Z)">↶</button>
+                    <button type="button" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="다시 실행 (Ctrl+Y)">↷</button>
+                  </div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">실행</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('italic') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="기울임꼴 (Ctrl+I)"
-          >
-            <em>I</em>
-          </button>
+              {/* 글꼴 그룹 (Font) */}
+              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+                <div className="flex flex-col gap-1 flex-1">
+                  <div className="flex items-center gap-1">
+                    <select onChange={handleFontFamilyChange} className="px-1 py-0.5 text-xs border border-gray-300 rounded bg-white w-32" defaultValue="">
+                      <option value="">본문 폰트</option>
+                      <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
+                      <option value="'맑은 고딕'">맑은 고딕</option>
+                      <option value="Arial">Arial</option>
+                      <option value="'Times New Roman'">Times New Roman</option>
+                      <option value="'Courier New'">Courier New</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Verdana">Verdana</option>
+                    </select>
+                    <select onChange={handleFontSizeChange} className="px-1 py-0.5 text-xs border border-gray-300 rounded bg-white w-14" defaultValue="">
+                      <option value="" disabled>크기</option>
+                      {[8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(s => <option key={s} value={`${s}pt`}>{s}</option>)}
+                    </select>
+                    <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().run()} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="서식 지우기">✕ᴬ</button>
+                  </div>
+                  <div className="flex items-center gap-0.5 flex-wrap">
+                    <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bold') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="굵게"><strong>B</strong></button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('italic') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="기울임"><em>I</em></button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('underline') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="밑줄"><u>U</u></button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('strike') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="취소선"><s>S</s></button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleSubscript().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('subscript') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="아래 첨자">x₂</button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleSuperscript().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('superscript') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="위 첨자">x²</button>
+                    <label className="flex items-center cursor-pointer rounded hover:bg-blue-100 px-1 h-7" title="글자 색">
+                      <span className="text-xs text-red-600 font-bold">A</span>
+                      <input type="color" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} className="w-3 h-3 ml-0.5 cursor-pointer border-0" />
+                    </label>
+                    <label className="flex items-center cursor-pointer rounded hover:bg-blue-100 px-1 h-7" title="형광펜">
+                      <span className="text-xs">🖍</span>
+                      <input type="color" onInput={(e) => editor.chain().focus().toggleHighlight({ color: (e.target as HTMLInputElement).value }).run()} className="w-3 h-3 ml-0.5 cursor-pointer border-0" />
+                    </label>
+                  </div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">글꼴</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('underline') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="밑줄 (Ctrl+U)"
-          >
-            <u>U</u>
-          </button>
+              {/* 단락 그룹 (Paragraph) */}
+              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+                <div className="flex flex-col gap-1 flex-1">
+                  <div className="flex items-center gap-0.5">
+                    <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="글머리 기호">•≡</button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('orderedList') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="번호 매기기">1.≡</button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('blockquote') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="인용">❝</button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('codeBlock') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="코드 블록">{'<>'}</button>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="왼쪽 정렬">⫷</button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="가운데 정렬">≡</button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="오른쪽 정렬">⫸</button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="양쪽 정렬">☰</button>
+                  </div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('strike') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="취소선"
-          >
-            <s>S</s>
-          </button>
+              {/* 스타일 그룹 (Heading) */}
+              <div className="flex flex-col items-center px-2">
+                <div className="flex gap-1 flex-1 items-center">
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 1 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 1</button>
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 2</button>
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 3</button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">스타일</div>
+              </div>
+            </div>
+          )}
 
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
+          {/* ========== 삽입 탭 ========== */}
+          {activeTab === 'insert' && (
+            <div className="flex items-stretch gap-0 min-h-[92px]">
+              {/* 표 삽입 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="text-center">
+                    <div className="text-2xl">⊞</div>
+                    <div className="flex items-center gap-1 text-[10px] text-gray-600">
+                      <span>행</span>
+                      <input type="number" min={1} max={50} value={tableRows} onChange={(e) => setTableRows(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))} className="w-10 px-1 text-xs border border-gray-300 rounded" />
+                      <span>열</span>
+                      <input type="number" min={1} max={20} value={tableCols} onChange={(e) => setTableCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))} className="w-10 px-1 text-xs border border-gray-300 rounded" />
+                    </div>
+                    <div className="flex gap-1 mt-1">
+                      <button type="button" onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()} className="px-2 py-0.5 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700">머리글 포함</button>
+                      <button type="button" onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: false }).run()} className="px-2 py-0.5 text-[10px] bg-gray-200 text-gray-800 rounded hover:bg-gray-300">없음</button>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표</div>
+              </div>
 
-          {/* 위 첨자/아래 첨자 */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleSuperscript().run()}
-            className={`px-2 py-1 text-sm rounded ${editor.isActive('superscript') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="위 첨자"
-          >
-            x²
-          </button>
+              {/* 그림/미디어 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={addImage} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="이미지">
+                    <span className="text-2xl">🖼️</span>
+                    <span className="text-[10px] text-gray-700">그림</span>
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="구분선">
+                    <span className="text-2xl">―</span>
+                    <span className="text-[10px] text-gray-700">구분선</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">일러스트</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleSubscript().run()}
-            className={`px-2 py-1 text-sm rounded ${editor.isActive('subscript') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="아래 첨자"
-          >
-            x₂
-          </button>
+              {/* 링크 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={() => setShowLinkInput(!showLinkInput)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="링크">
+                    <span className="text-2xl">🔗</span>
+                    <span className="text-[10px] text-gray-700">링크</span>
+                  </button>
+                  <button type="button" onClick={() => setShowLinkPreviewInput(!showLinkPreviewInput)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="링크 카드">
+                    <span className="text-2xl">📎</span>
+                    <span className="text-[10px] text-gray-700">링크 카드</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">링크</div>
+              </div>
+            </div>
+          )}
 
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
+          {/* ========== 표 디자인 탭 ========== */}
+          {activeTab === 'tableDesign' && (
+            <div className="flex items-stretch gap-0 min-h-[92px]">
+              {/* 표 스타일 옵션 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 flex-1">
+                  {[
+                    { cls: 'header-row', label: '머리글 행' },
+                    { cls: 'first-column', label: '첫째 열' },
+                    { cls: 'total-row', label: '요약 행' },
+                    { cls: 'last-column', label: '마지막 열' },
+                    { cls: 'banded-rows', label: '줄무늬 행' },
+                    { cls: 'banded-columns', label: '줄무늬 열' },
+                  ].map(opt => (
+                    <label key={opt.cls} className="flex items-center gap-1 text-[11px] cursor-pointer hover:bg-blue-50 px-1 rounded">
+                      <input type="checkbox" checked={hasTableClass(opt.cls)} onChange={() => toggleTableClass(opt.cls)} className="w-3 h-3" />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표 스타일 옵션</div>
+              </div>
 
-          {/* 텍스트 색상 */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-600">A</span>
-            <input
-              type="color"
-              onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
-              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-              title="텍스트 색상"
-            />
-          </div>
+              {/* 표 스타일 갤러리 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 min-w-[340px]">
+                <div className="flex-1 w-full overflow-x-auto">
+                  <div className="flex gap-1.5">
+                    {[
+                      { cls: 'tbl-grid', label: '격자' },
+                      { cls: 'tbl-plain', label: '단순' },
+                      { cls: 'tbl-striped', label: '줄무늬' },
+                      { cls: 'tbl-header', label: '머리글' },
+                      { cls: 'tbl-colorful', label: '컬러' },
+                      { cls: 'tbl-minimal', label: '미니멀' },
+                      { cls: 'tbl-dark', label: '다크' },
+                    ].map(s => (
+                      <button
+                        key={s.cls}
+                        type="button"
+                        onClick={() => setTableStyle(s.cls)}
+                        className={`border rounded px-1 py-1 hover:ring-2 hover:ring-blue-400 ${hasTableClass(s.cls) ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300'}`}
+                        title={s.label}
+                      >
+                        <div className={`preview-table ${s.cls}`}>
+                          <div className="pt-row pt-head"><div className="pt-cell"></div><div className="pt-cell"></div><div className="pt-cell"></div></div>
+                          <div className="pt-row"><div className="pt-cell"></div><div className="pt-cell"></div><div className="pt-cell"></div></div>
+                          <div className="pt-row"><div className="pt-cell"></div><div className="pt-cell"></div><div className="pt-cell"></div></div>
+                        </div>
+                        <div className="text-[9px] text-gray-600 text-center mt-0.5">{s.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표 스타일</div>
+              </div>
 
-          {/* 형광펜 */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-600">🖍️</span>
-            <input
-              type="color"
-              onInput={(e) => editor.chain().focus().toggleHighlight({ color: (e.target as HTMLInputElement).value }).run()}
-              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-              title="형광펜"
-            />
-          </div>
+              {/* 셀 음영 (Shading) */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex-1 flex items-start pt-1">
+                  <button type="button" onClick={() => setShowShadingMenu(!showShadingMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="셀 음영">
+                    <span className="text-2xl">🎨</span>
+                    <span className="text-[10px] text-gray-700">음영 ▾</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">음영</div>
+                {showShadingMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-56">
+                    <div className="text-xs font-semibold text-gray-700 mb-1">표준 색</div>
+                    <div className="grid grid-cols-8 gap-1">
+                      {['#ffffff','#f3f4f6','#e5e7eb','#d1d5db','#9ca3af','#6b7280','#374151','#111827',
+                        '#fee2e2','#fecaca','#fca5a5','#f87171','#ef4444','#dc2626','#b91c1c','#7f1d1d',
+                        '#fef3c7','#fde68a','#fcd34d','#fbbf24','#f59e0b','#d97706','#b45309','#78350f',
+                        '#d1fae5','#a7f3d0','#6ee7b7','#34d399','#10b981','#059669','#047857','#064e3b',
+                        '#dbeafe','#bfdbfe','#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#1e3a8a',
+                        '#e9d5ff','#d8b4fe','#c084fc','#a855f7','#9333ea','#7c3aed','#6b21a8','#4c1d95'].map(c => (
+                        <button key={c} type="button" onClick={() => setCellShading(c)} style={{ backgroundColor: c }} className="w-5 h-5 border border-gray-300 hover:scale-110 transition" title={c} />
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setCellShading(null)} className="mt-2 w-full px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">음영 없음</button>
+                  </div>
+                )}
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().unsetAllMarks().run()}
-            className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
-            title="서식 지우기"
-          >
-            ✕ 서식
-          </button>
-        </div>
+              {/* 테두리 (Borders) */}
+              <div className="flex flex-col items-center px-3 relative">
+                <div className="flex-1 flex items-start pt-1">
+                  <button type="button" onClick={() => setShowBordersMenu(!showBordersMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="테두리">
+                    <span className="text-2xl">⊟</span>
+                    <span className="text-[10px] text-gray-700">테두리 ▾</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">테두리</div>
+                {showBordersMenu && (
+                  <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-44">
+                    {[
+                      { mode: 'default', label: '기본' },
+                      { mode: 'all', label: '모든 테두리' },
+                      { mode: 'outside', label: '바깥쪽 테두리' },
+                      { mode: 'inside', label: '안쪽 테두리' },
+                      { mode: 'top', label: '위쪽 테두리' },
+                      { mode: 'bottom', label: '아래쪽 테두리' },
+                      { mode: 'thick', label: '굵은 테두리' },
+                      { mode: 'none', label: '테두리 없음' },
+                    ].map(b => (
+                      <button key={b.mode} type="button" onClick={() => setTableBorderMode(b.mode)} className="w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded">
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-        {/* 세 번째 줄: 헤딩, 정렬 */}
-        <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`px-3 py-1 rounded ${editor.isActive('heading', { level: 1 }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-          >
-            H1
-          </button>
+          {/* ========== 표 레이아웃 탭 ========== */}
+          {activeTab === 'tableLayout' && (
+            <div className="flex items-stretch gap-0 min-h-[92px]">
+              {/* 삭제 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-1 flex-1">
+                  <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="flex flex-col items-center px-2 py-1 hover:bg-red-50 rounded text-red-600" title="행 삭제">
+                    <span className="text-lg">⊖</span>
+                    <span className="text-[10px]">행 삭제</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="flex flex-col items-center px-2 py-1 hover:bg-red-50 rounded text-red-600" title="열 삭제">
+                    <span className="text-lg">⊖</span>
+                    <span className="text-[10px]">열 삭제</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="flex flex-col items-center px-2 py-1 hover:bg-red-50 rounded text-red-600" title="표 삭제">
+                    <span className="text-lg">🗑</span>
+                    <span className="text-[10px]">표 삭제</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">삭제</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`px-3 py-1 rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-          >
-            H2
-          </button>
+              {/* 행 및 열 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-1 flex-1">
+                  <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⬆</span>
+                    <span className="text-[10px]">위에 삽입</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⬇</span>
+                    <span className="text-[10px]">아래 삽입</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⬅</span>
+                    <span className="text-[10px]">왼쪽 삽입</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">➡</span>
+                    <span className="text-[10px]">오른쪽 삽입</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">행 및 열</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            className={`px-3 py-1 rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-          >
-            H3
-          </button>
+              {/* 병합 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-1 flex-1">
+                  <button type="button" onClick={() => editor.chain().focus().mergeCells().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⊞</span>
+                    <span className="text-[10px]">셀 병합</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().splitCell().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⊟</span>
+                    <span className="text-[10px]">셀 분할</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">병합</div>
+              </div>
 
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
+              {/* 머리글 토글 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="flex items-start gap-1 flex-1">
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeaderRow().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⊤</span>
+                    <span className="text-[10px]">머리글 행</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeaderColumn().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⊣</span>
+                    <span className="text-[10px]">머리글 열</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().toggleHeaderCell().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⊞</span>
+                    <span className="text-[10px]">머리글 셀</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">머리글</div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setTextAlign('left').run()}
-            className={`px-3 py-1 rounded ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="왼쪽 정렬"
-          >
-            ≡
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setTextAlign('center').run()}
-            className={`px-3 py-1 rounded ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="가운데 정렬"
-          >
-            ≣
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setTextAlign('right').run()}
-            className={`px-3 py-1 rounded ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="오른쪽 정렬"
-          >
-            ≡
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-            className={`px-3 py-1 rounded ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="양쪽 정렬"
-          >
-            ≣
-          </button>
-        </div>
-
-        {/* 네 번째 줄: 목록, 인용, 코드, 표, 이미지, 링크 */}
-        <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('bulletList') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="글머리 기호"
-          >
-            • 목록
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('orderedList') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="번호 매기기"
-          >
-            1. 목록
-          </button>
-
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('blockquote') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="인용구"
-          >
-            " 인용
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            className={`px-3 py-1 rounded ${editor.isActive('codeBlock') ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100 border border-transparent'}`}
-            title="코드 블록"
-          >
-            {'<>'} 코드
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            className="px-3 py-1 rounded hover:bg-gray-100 border border-transparent"
-            title="수평선"
-          >
-            ― 구분선
-          </button>
-
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-          {/* 표 메뉴 (Word Table Design 수준) */}
-          <button
-            type="button"
-            onClick={() => setShowTableMenu(!showTableMenu)}
-            className={`px-3 py-1 rounded border ${showTableMenu ? 'bg-blue-100 border-blue-300' : 'border-transparent hover:bg-gray-100'}`}
-            title="표 삽입 및 디자인"
-          >
-            ⊞ 표 ▾
-          </button>
-
-          <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-          {/* 이미지 */}
-          <button
-            type="button"
-            onClick={addImage}
-            className="px-3 py-1 rounded hover:bg-gray-100 border border-transparent"
-            title="이미지"
-          >
-            🖼️ 이미지
-          </button>
-
-          {/* 링크 */}
-          <button
-            type="button"
-            onClick={() => setShowLinkInput(!showLinkInput)}
-            className="px-3 py-1 rounded hover:bg-gray-100 border border-transparent"
-            title="하이퍼링크"
-          >
-            🔗 링크
-          </button>
-
-          {/* 링크 프리뷰 카드 */}
-          <button
-            type="button"
-            onClick={() => setShowLinkPreviewInput(!showLinkPreviewInput)}
-            className="px-3 py-1 rounded hover:bg-gray-100 bg-blue-50 border border-transparent"
-            title="링크 썸네일 카드"
-          >
-            📎 링크 카드
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+              {/* 맞춤 */}
+              <div className="flex flex-col items-center px-3">
+                <div className="flex items-start gap-1 flex-1">
+                  <button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⫷</span>
+                    <span className="text-[10px]">왼쪽</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">≡</span>
+                    <span className="text-[10px]">가운데</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
+                    <span className="text-lg">⫸</span>
+                    <span className="text-[10px]">오른쪽</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">맞춤</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 링크 입력 박스 */}
       {showLinkInput && (
-        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-yellow-50">
+        <div className="border-b border-gray-300 p-3 bg-yellow-50">
           <div className="flex gap-2">
-            <input
-              type="url"
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="https://example.com"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setLink()
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={setLink}
-              disabled={!linkUrl}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
-            >
-              삽입
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowLinkInput(false)
-                setLinkUrl('')
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-            >
-              취소
-            </button>
+            <input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onKeyDown={(e) => { if (e.key === 'Enter') setLink() }} />
+            <button type="button" onClick={setLink} disabled={!linkUrl} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300">삽입</button>
+            <button type="button" onClick={() => { setShowLinkInput(false); setLinkUrl('') }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">취소</button>
           </div>
-          <p className="text-xs text-gray-600 mt-2">
-            💡 일반 하이퍼링크 (클릭 가능한 텍스트)
-          </p>
         </div>
       )}
 
       {/* 링크 프리뷰 입력 박스 */}
       {showLinkPreviewInput && (
-        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-blue-50">
+        <div className="border-b border-gray-300 p-3 bg-blue-50">
           <div className="flex gap-2">
-            <input
-              type="url"
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="https://example.com 또는 유튜브 링크"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  fetchLinkPreview(linkUrl)
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fetchLinkPreview(linkUrl)}
-              disabled={!linkUrl || fetchingPreview}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
-            >
-              {fetchingPreview ? '생성 중...' : '삽입'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowLinkPreviewInput(false)
-                setLinkUrl('')
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-            >
-              취소
-            </button>
+            <input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com 또는 유튜브 링크" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onKeyDown={(e) => { if (e.key === 'Enter') fetchLinkPreview(linkUrl) }} />
+            <button type="button" onClick={() => fetchLinkPreview(linkUrl)} disabled={!linkUrl || fetchingPreview} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300">{fetchingPreview ? '생성 중...' : '삽입'}</button>
+            <button type="button" onClick={() => { setShowLinkPreviewInput(false); setLinkUrl('') }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">취소</button>
           </div>
-          <p className="text-xs text-gray-600 mt-2">
-            💡 유튜브, 기사, 블로그 링크를 입력하면 썸네일 카드가 생성됩니다. 링크를 지워도 카드는 남아있습니다.
-          </p>
-        </div>
-      )}
-
-      {/* 표 디자인 메뉴 (Word 수준) */}
-      {showTableMenu && (
-        <div className="sticky top-[200px] z-10 border-b border-gray-300 p-3 bg-indigo-50 space-y-3">
-          {/* 표 삽입 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-gray-700">표 삽입:</span>
-            <label className="text-xs text-gray-600">행</label>
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={tableRows}
-              onChange={(e) => setTableRows(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-              className="w-14 px-2 py-1 text-xs border border-gray-300 rounded"
-            />
-            <label className="text-xs text-gray-600">열</label>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={tableCols}
-              onChange={(e) => setTableCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-              className="w-14 px-2 py-1 text-xs border border-gray-300 rounded"
-            />
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()}
-              className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              + 표 만들기 (머리글 포함)
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: false }).run()}
-              className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-            >
-              + 표 만들기 (머리글 없음)
-            </button>
-          </div>
-
-          {/* 행/열 편집 */}
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-xs font-semibold text-gray-700 mr-1">행/열:</span>
-            <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">↑ 행 위</button>
-            <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">↓ 행 아래</button>
-            <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-red-50 text-red-600">행 삭제</button>
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-            <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">← 열 왼쪽</button>
-            <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">→ 열 오른쪽</button>
-            <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-red-50 text-red-600">열 삭제</button>
-          </div>
-
-          {/* 셀 병합/분할 / 머리글 / 삭제 */}
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-xs font-semibold text-gray-700 mr-1">셀:</span>
-            <button type="button" onClick={() => editor.chain().focus().mergeCells().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">셀 병합</button>
-            <button type="button" onClick={() => editor.chain().focus().splitCell().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">셀 분할</button>
-            <button type="button" onClick={() => editor.chain().focus().mergeOrSplit().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">병합/분할</button>
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-            <button type="button" onClick={() => editor.chain().focus().toggleHeaderRow().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 행</button>
-            <button type="button" onClick={() => editor.chain().focus().toggleHeaderColumn().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 열</button>
-            <button type="button" onClick={() => editor.chain().focus().toggleHeaderCell().run()} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100">머리글 셀</button>
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-            <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="px-2 py-1 text-xs border border-red-300 rounded bg-white text-red-600 hover:bg-red-50">표 삭제</button>
-          </div>
-
-          {/* 셀 배경색 (음영) */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-gray-700">셀 음영:</span>
-            {['#ffffff','#fef3c7','#fecaca','#bbf7d0','#bfdbfe','#e9d5ff','#fed7aa','#e5e7eb','#374151'].map(c => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: c }).updateAttributes('tableHeader', { backgroundColor: c }).run()}
-                style={{ backgroundColor: c }}
-                className="w-6 h-6 border border-gray-400 rounded cursor-pointer hover:scale-110 transition"
-                title={c}
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run()}
-              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100"
-            >
-              음영 지우기
-            </button>
-          </div>
-
-          {/* 표 스타일 (Word Table Styles) */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-gray-700">표 스타일:</span>
-            {[
-              { cls: 'tbl-grid', label: '격자' },
-              { cls: 'tbl-plain', label: '단순' },
-              { cls: 'tbl-striped', label: '줄무늬' },
-              { cls: 'tbl-header', label: '머리글 강조' },
-              { cls: 'tbl-colorful', label: '컬러풀' },
-              { cls: 'tbl-minimal', label: '미니멀' },
-              { cls: 'tbl-dark', label: '다크' },
-            ].map(s => (
-              <button
-                key={s.cls}
-                type="button"
-                onClick={() => editor.chain().focus().updateAttributes('table', { class: s.cls }).run()}
-                className="px-3 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-indigo-100"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          <p className="text-xs text-gray-500">
-            💡 팁: 셀 내부에 커서를 두고 위 버튼들을 누르세요. 행/열을 드래그해 크기를 조절할 수 있습니다.
-          </p>
         </div>
       )}
 
       {/* 에디터 (A4 narrow margin 1.27cm 레이아웃) */}
-      <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-100 p-4' : 'bg-gray-100 p-4'}>
+      <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-200 p-4' : 'bg-gray-200 p-4'}>
         <div
           className="mx-auto bg-white shadow-md"
           style={{
@@ -1173,7 +1094,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           <EditorContent editor={editor} />
         </div>
       </div>
-      
+
       {/* 사용 안내 */}
       <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
         💡 팁: Ctrl+Z 되돌리기, Ctrl+B 굵게, Ctrl+I 기울임, Ctrl+U 밑줄 | 🔗 링크 = 텍스트 링크, 📎 링크 카드 = 썸네일
@@ -1351,6 +1272,89 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .link-preview-card:hover {
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
+        /* ============ Word 스타일 옵션 (table style options) ============ */
+        /* 머리글 행 — 첫 행 강조 */
+        .ProseMirror table.header-row tr:first-child td,
+        .ProseMirror table.header-row tr:first-child th {
+          background-color: #1e40af;
+          color: #ffffff;
+          font-weight: 700;
+        }
+        /* 요약 행 — 마지막 행 강조 */
+        .ProseMirror table.total-row tr:last-child td,
+        .ProseMirror table.total-row tr:last-child th {
+          border-top: 2px solid #1e3a8a;
+          border-bottom: 2px solid #1e3a8a;
+          font-weight: 700;
+          background-color: #eff6ff;
+        }
+        /* 줄무늬 행 */
+        .ProseMirror table.banded-rows tr:nth-child(even) td,
+        .ProseMirror table.banded-rows tr:nth-child(even) th {
+          background-color: #f3f4f6;
+        }
+        /* 첫째 열 강조 */
+        .ProseMirror table.first-column td:first-child,
+        .ProseMirror table.first-column th:first-child {
+          font-weight: 700;
+          background-color: #eff6ff;
+        }
+        /* 마지막 열 강조 */
+        .ProseMirror table.last-column td:last-child,
+        .ProseMirror table.last-column th:last-child {
+          font-weight: 700;
+          background-color: #eff6ff;
+        }
+        /* 줄무늬 열 */
+        .ProseMirror table.banded-columns td:nth-child(even),
+        .ProseMirror table.banded-columns th:nth-child(even) {
+          background-color: #f9fafb;
+        }
+
+        /* ============ 테두리 모드 (Borders dropdown) ============ */
+        .ProseMirror table.borders-all td,
+        .ProseMirror table.borders-all th { border: 1px solid #374151 !important; }
+        .ProseMirror table.borders-outside { border: 2px solid #374151; }
+        .ProseMirror table.borders-outside td,
+        .ProseMirror table.borders-outside th { border: none !important; }
+        .ProseMirror table.borders-inside td,
+        .ProseMirror table.borders-inside th { border: 1px solid #9ca3af !important; }
+        .ProseMirror table.borders-inside { border: none; }
+        .ProseMirror table.borders-top tr:first-child td,
+        .ProseMirror table.borders-top tr:first-child th { border-top: 2px solid #374151 !important; }
+        .ProseMirror table.borders-bottom tr:last-child td,
+        .ProseMirror table.borders-bottom tr:last-child th { border-bottom: 2px solid #374151 !important; }
+        .ProseMirror table.borders-thick td,
+        .ProseMirror table.borders-thick th { border: 2px solid #111827 !important; }
+        .ProseMirror table.borders-none td,
+        .ProseMirror table.borders-none th { border: none !important; }
+        .ProseMirror table.borders-none { border: none !important; }
+
+        /* ============ 미리보기 표 (갤러리 섬네일) ============ */
+        .preview-table {
+          width: 56px;
+          display: block;
+        }
+        .preview-table .pt-row { display: flex; }
+        .preview-table .pt-cell {
+          width: 18px;
+          height: 8px;
+          border: 1px solid #9ca3af;
+          background: #ffffff;
+        }
+        .preview-table.tbl-grid .pt-head .pt-cell { background: #f3f4f6; }
+        .preview-table.tbl-plain .pt-cell { border-color: #e5e7eb; }
+        .preview-table.tbl-plain .pt-head .pt-cell { border-bottom: 2px solid #6b7280; background: transparent; }
+        .preview-table.tbl-striped .pt-head .pt-cell { background: #4b5563; border-color: #4b5563; }
+        .preview-table.tbl-striped .pt-row:nth-child(2) .pt-cell { background: #f9fafb; }
+        .preview-table.tbl-header .pt-head .pt-cell { background: #1e40af; border-color: #1e3a8a; }
+        .preview-table.tbl-colorful .pt-head .pt-cell { background: #7c3aed; border-color: #a78bfa; }
+        .preview-table.tbl-colorful .pt-row:nth-child(2) .pt-cell { background: #f5f3ff; }
+        .preview-table.tbl-minimal .pt-cell { border: none; border-bottom: 1px solid #e5e7eb; }
+        .preview-table.tbl-minimal .pt-head .pt-cell { border-bottom: 2px solid #111827; }
+        .preview-table.tbl-dark .pt-cell { background: #1f2937; border-color: #374151; }
+        .preview-table.tbl-dark .pt-head .pt-cell { background: #111827; }
       `}</style>
     </div>
   )

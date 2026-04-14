@@ -120,3 +120,35 @@
 .prose table.tbl-dark td,
 .prose table.tbl-dark th { border: 1px solid #374151; background-color: #1f2937; color: #f3f4f6; }
 .prose table.tbl-dark th { background-color: #111827; color: #fff; font-weight: 700; }
+
+/* Word 스타일 옵션 (view) */
+.prose table.header-row tr:first-child td,
+.prose table.header-row tr:first-child th { background-color: #1e40af; color: #fff; font-weight: 700; }
+.prose table.total-row tr:last-child td,
+.prose table.total-row tr:last-child th { border-top: 2px solid #1e3a8a; border-bottom: 2px solid #1e3a8a; font-weight: 700; background-color: #eff6ff; }
+.prose table.banded-rows tr:nth-child(even) td,
+.prose table.banded-rows tr:nth-child(even) th { background-color: #f3f4f6; }
+.prose table.first-column td:first-child,
+.prose table.first-column th:first-child { font-weight: 700; background-color: #eff6ff; }
+.prose table.last-column td:last-child,
+.prose table.last-column th:last-child { font-weight: 700; background-color: #eff6ff; }
+.prose table.banded-columns td:nth-child(even),
+.prose table.banded-columns th:nth-child(even) { background-color: #f9fafb; }
+
+/* 테두리 모드 (view) */
+.prose table.borders-all td,
+.prose table.borders-all th { border: 1px solid #374151 !important; }
+.prose table.borders-outside { border: 2px solid #374151; }
+.prose table.borders-outside td,
+.prose table.borders-outside th { border: none !important; }
+.prose table.borders-inside td,
+.prose table.borders-inside th { border: 1px solid #9ca3af !important; }
+.prose table.borders-top tr:first-child td,
+.prose table.borders-top tr:first-child th { border-top: 2px solid #374151 !important; }
+.prose table.borders-bottom tr:last-child td,
+.prose table.borders-bottom tr:last-child th { border-bottom: 2px solid #374151 !important; }
+.prose table.borders-thick td,
+.prose table.borders-thick th { border: 2px solid #111827 !important; }
+.prose table.borders-none td,
+.prose table.borders-none th { border: none !important; }
+.prose table.borders-none { border: none !important; }
