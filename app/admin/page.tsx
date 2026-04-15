@@ -23,10 +23,43 @@ export default function AdminPage() {
     published: false,
     category: '경제' as string
   })
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [hasStoredDraft, setHasStoredDraft] = useState(false)
+
+  // 임시 저장 키: 새 글이면 draft:new, 편집 중이면 draft:<id>
+  const getDraftKey = () => `blog-draft:${editingPost?.id || 'new'}`
 
   useEffect(() => {
     checkUser()
   }, [])
+
+  // 페이지 로드 시 새 글 임시저장 여부 체크 (상단 배너용)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setHasStoredDraft(!!localStorage.getItem('blog-draft:new'))
+  }, [showForm])
+
+  // 폼이 열려있는 동안 formData 를 localStorage 에 자동 저장 (디바운스)
+  useEffect(() => {
+    if (!showForm) return
+    if (typeof window === 'undefined') return
+    const t = setTimeout(() => {
+      const payload = {
+        ...formData,
+        savedAt: new Date().toISOString(),
+        editingPostId: editingPost?.id || null,
+      }
+      try {
+        localStorage.setItem(getDraftKey(), JSON.stringify(payload))
+        setLastSavedAt(new Date())
+      } catch (e) {
+        // localStorage 용량 초과 등
+        console.warn('임시 저장 실패:', e)
+      }
+    }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, showForm, editingPost])
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -117,6 +150,29 @@ export default function AdminPage() {
 
   function handleNewPost() {
     setEditingPost(null)
+    // 새 글 임시저장 확인
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('blog-draft:new') : null
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw)
+        const savedAt = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ko-KR') : ''
+        const preview = (draft.title || '제목 없음') + (draft.content ? ' (내용 있음)' : '')
+        if (confirm(`이전에 작성 중이던 글이 있습니다.\n\n${preview}\n저장 시각: ${savedAt}\n\n이어서 작성하시겠습니까?\n(취소를 누르면 빈 글로 새로 시작합니다)`)) {
+          setFormData({
+            title: draft.title || '',
+            slug: draft.slug || '',
+            content: draft.content || '',
+            excerpt: draft.excerpt || '',
+            published: !!draft.published,
+            category: draft.category || '경제',
+          })
+          setShowForm(true)
+          return
+        } else {
+          localStorage.removeItem('blog-draft:new')
+        }
+      } catch {}
+    }
     setFormData({
       title: '',
       slug: '',
@@ -130,6 +186,36 @@ export default function AdminPage() {
 
   function handleEdit(post: Post) {
     setEditingPost(post)
+    // 이 글의 이전 임시저장 확인 (DB 상태와 다르면 복구 제안)
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(`blog-draft:${post.id}`) : null
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw)
+        const differs =
+          draft.title !== post.title ||
+          draft.content !== post.content ||
+          draft.excerpt !== (post.excerpt || '') ||
+          draft.slug !== post.slug ||
+          draft.category !== post.category
+        if (differs) {
+          const savedAt = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ko-KR') : ''
+          if (confirm(`이 글에 저장되지 않은 임시 수정본이 있습니다.\n저장 시각: ${savedAt}\n\n임시본을 불러오시겠습니까?\n(취소를 누르면 현재 DB 버전으로 편집합니다)`)) {
+            setFormData({
+              title: draft.title || post.title,
+              slug: draft.slug || post.slug,
+              content: draft.content || post.content,
+              excerpt: draft.excerpt || post.excerpt || '',
+              published: draft.published ?? post.published,
+              category: draft.category || post.category,
+            })
+            setShowForm(true)
+            return
+          } else {
+            localStorage.removeItem(`blog-draft:${post.id}`)
+          }
+        }
+      } catch {}
+    }
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -139,6 +225,40 @@ export default function AdminPage() {
       category: post.category
     })
     setShowForm(true)
+  }
+
+  // 수동 임시 저장 (버튼 클릭)
+  function handleSaveDraft() {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(
+        getDraftKey(),
+        JSON.stringify({
+          ...formData,
+          savedAt: new Date().toISOString(),
+          editingPostId: editingPost?.id || null,
+        })
+      )
+      setLastSavedAt(new Date())
+      alert('임시 저장되었습니다. 나중에 이어서 작성할 수 있습니다.')
+    } catch (e: any) {
+      alert('임시 저장 실패: ' + (e?.message || e))
+    }
+  }
+
+  function clearDraft() {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(getDraftKey())
+    setLastSavedAt(null)
+  }
+
+  function handleDiscardDraft() {
+    if (!confirm('저장된 임시본을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('blog-draft:new')
+    }
+    setHasStoredDraft(false)
+    alert('임시 저장본을 삭제했습니다.')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -162,6 +282,7 @@ export default function AdminPage() {
         alert('수정 실패: ' + error.message)
       } else {
         alert('글이 수정되었습니다!')
+        clearDraft()
         setShowForm(false)
         fetchPosts()
       }
@@ -177,11 +298,12 @@ export default function AdminPage() {
           category: formData.category,
           author_id: user.id
         }])
-      
+
       if (error) {
         alert('작성 실패: ' + error.message)
       } else {
         alert('글이 작성되었습니다!')
+        clearDraft()
         setShowForm(false)
         fetchPosts()
       }
@@ -334,12 +456,20 @@ export default function AdminPage() {
                 </label>
               </div>
 
-              <div className="flex gap-4 flex-wrap">
+              <div className="flex gap-4 flex-wrap items-center">
                 <button
                   type="submit"
                   className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
                 >
                   {editingPost ? '수정 완료' : '작성 완료'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  className="bg-amber-500 text-white px-8 py-3 rounded-lg hover:bg-amber-600 transition font-medium"
+                  title="임시 저장 (브라우저에 저장, 나중에 이어서 작성)"
+                >
+                  💾 임시 저장
                 </button>
                 <button
                   type="button"
@@ -356,8 +486,38 @@ export default function AdminPage() {
                 >
                   취소
                 </button>
+                {lastSavedAt && (
+                  <span className="text-sm text-gray-500 ml-2">
+                    ✓ 자동 저장됨 {lastSavedAt.toLocaleTimeString('ko-KR')}
+                  </span>
+                )}
               </div>
             </form>
+          </div>
+        )}
+
+        {/* 새 글 임시 저장 복구 배너 (폼이 닫혀있을 때만 표시) */}
+        {!showForm && hasStoredDraft && (
+          <div className="mb-8 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="text-sm text-amber-900">
+              💾 이전에 작성 중이던 <strong>새 글 임시 저장본</strong>이 있습니다. 이어서 작성할 수 있습니다.
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleNewPost}
+                className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm font-medium"
+              >
+                이어서 작성
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="bg-white text-amber-700 border border-amber-300 px-4 py-2 rounded hover:bg-amber-100 text-sm"
+              >
+                임시본 삭제
+              </button>
+            </div>
           </div>
         )}
 
