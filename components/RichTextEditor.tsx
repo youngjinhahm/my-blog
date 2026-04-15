@@ -179,20 +179,19 @@ const LineHeight = Extension.create({
     ]
   },
   addCommands() {
+    const types = this.options.types
     return {
-      // @ts-ignore
-      setLineHeight: (lineHeight: string) => ({ commands }) => {
-        return this.options.types.every((type: string) =>
+      setLineHeight: (lineHeight: string) => ({ commands }: any) => {
+        return types.every((type: string) =>
           commands.updateAttributes(type, { lineHeight })
         )
       },
-      // @ts-ignore
-      unsetLineHeight: () => ({ commands }) => {
-        return this.options.types.every((type: string) =>
+      unsetLineHeight: () => ({ commands }: any) => {
+        return types.every((type: string) =>
           commands.resetAttributes(type, 'lineHeight')
         )
       },
-    }
+    } as any
   },
 })
 
@@ -231,23 +230,21 @@ const Indent = Extension.create({
   addCommands() {
     const { step, max, types } = this.options
     return {
-      // @ts-ignore
-      indent: () => ({ state, commands }) => {
+      indent: () => ({ state, commands }: any) => {
         const { selection } = state
         const node = selection.$from.node(selection.$from.depth)
         if (!node || !types.includes(node.type.name)) return false
         const next = Math.min((node.attrs.indent || 0) + step, max)
         return commands.updateAttributes(node.type.name, { indent: next })
       },
-      // @ts-ignore
-      outdent: () => ({ state, commands }) => {
+      outdent: () => ({ state, commands }: any) => {
         const { selection } = state
         const node = selection.$from.node(selection.$from.depth)
         if (!node || !types.includes(node.type.name)) return false
         const next = Math.max((node.attrs.indent || 0) - step, 0)
         return commands.updateAttributes(node.type.name, { indent: next })
       },
-    }
+    } as any
   },
 })
 
