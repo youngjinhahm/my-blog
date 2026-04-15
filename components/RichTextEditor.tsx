@@ -515,19 +515,59 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         return false
       },
       handlePaste: function(view, event) {
-        const items = event.clipboardData?.items
-        if (items) {
+        const cd = event.clipboardData
+        if (!cd) return false
+
+        const html = cd.getData('text/html') || ''
+        const text = cd.getData('text/plain') || ''
+
+        // 1) Excel/스프레드시트/Word 에서 표를 복사: HTML에 <table>이 있으면
+        //    tiptap 기본 파서에 맡긴다 (썸네일 이미지 먼저 잡히는 것 방지)
+        if (/<table[\s>]/i.test(html)) {
+          return false
+        }
+
+        // 2) 순수 탭-구분 텍스트 (예: 구글 시트 → plain text): 표로 변환
+        if (!html && text && text.includes('\t') && /\r?\n/.test(text)) {
+          const rows = text
+            .replace(/\r/g, '')
+            .split('\n')
+            .filter(r => r.length > 0)
+            .map(r => r.split('\t'))
+          if (rows.length >= 1 && rows[0].length >= 2) {
+            const content = {
+              type: 'table',
+              attrs: { class: 'tbl-grid' },
+              content: rows.map((cells, idx) => ({
+                type: 'tableRow',
+                content: cells.map(c => ({
+                  type: idx === 0 ? 'tableHeader' : 'tableCell',
+                  content: [{
+                    type: 'paragraph',
+                    content: c ? [{ type: 'text', text: c }] : [],
+                  }],
+                })),
+              })),
+            }
+            event.preventDefault()
+            editor?.chain().focus().insertContent(content).run()
+            return true
+          }
+        }
+
+        // 3) 진짜 이미지 (HTML/text 대안이 없을 때만 업로드)
+        const items = cd.items
+        if (items && !html && !text) {
           for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
               event.preventDefault()
               const file = items[i].getAsFile()
-              if (file) {
-                uploadImage(file)
-              }
+              if (file) uploadImage(file)
               return true
             }
           }
         }
+
         return false
       },
     },
