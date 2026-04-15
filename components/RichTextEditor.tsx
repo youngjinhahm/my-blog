@@ -17,7 +17,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
-import { Mark, Node } from '@tiptap/core'
+import { Mark, Node, Extension } from '@tiptap/core'
 import { CellSelection, TableMap } from '@tiptap/pm/tables'
 
 // Word의 Table Styles 대응: 표에 스타일 프리셋 class 부여
@@ -147,6 +147,105 @@ const FontSize = Mark.create({
       },
       unsetFontSize: () => ({ chain }) => {
         return chain().unsetMark('fontSize').run()
+      },
+    }
+  },
+})
+
+// 줄 간격 (Line Spacing) Extension — paragraph / heading 에 lineHeight 적용
+const LineHeight = Extension.create({
+  name: 'lineHeight',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+      defaultLineHeight: null as string | null,
+    }
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          lineHeight: {
+            default: this.options.defaultLineHeight,
+            parseHTML: (element: HTMLElement) => element.style.lineHeight || null,
+            renderHTML: (attributes: any) => {
+              if (!attributes.lineHeight) return {}
+              return { style: `line-height: ${attributes.lineHeight}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  addCommands() {
+    return {
+      // @ts-ignore
+      setLineHeight: (lineHeight: string) => ({ commands }) => {
+        return this.options.types.every((type: string) =>
+          commands.updateAttributes(type, { lineHeight })
+        )
+      },
+      // @ts-ignore
+      unsetLineHeight: () => ({ commands }) => {
+        return this.options.types.every((type: string) =>
+          commands.resetAttributes(type, 'lineHeight')
+        )
+      },
+    }
+  },
+})
+
+// 단락 들여쓰기 Extension (Word Increase/Decrease Indent)
+const Indent = Extension.create({
+  name: 'indent',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+      step: 24, // px
+      max: 240,
+    }
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          indent: {
+            default: 0,
+            parseHTML: (element: HTMLElement) => {
+              const ml = element.style.marginLeft
+              if (!ml) return 0
+              const n = parseInt(ml, 10)
+              return isNaN(n) ? 0 : n
+            },
+            renderHTML: (attributes: any) => {
+              if (!attributes.indent) return {}
+              return { style: `margin-left: ${attributes.indent}px` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  addCommands() {
+    const { step, max, types } = this.options
+    return {
+      // @ts-ignore
+      indent: () => ({ state, commands }) => {
+        const { selection } = state
+        const node = selection.$from.node(selection.$from.depth)
+        if (!node || !types.includes(node.type.name)) return false
+        const next = Math.min((node.attrs.indent || 0) + step, max)
+        return commands.updateAttributes(node.type.name, { indent: next })
+      },
+      // @ts-ignore
+      outdent: () => ({ state, commands }) => {
+        const { selection } = state
+        const node = selection.$from.node(selection.$from.depth)
+        if (!node || !types.includes(node.type.name)) return false
+        const next = Math.max((node.attrs.indent || 0) - step, 0)
+        return commands.updateAttributes(node.type.name, { indent: next })
       },
     }
   },
@@ -418,6 +517,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [penWidth, setPenWidth] = useState('1pt')
   const [penStyle, setPenStyle] = useState<'solid'|'double'|'dashed'|'dotted'>('solid')
   const [penColor, setPenColor] = useState('#374151')
+  const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false)
+  const [showCaseMenu, setShowCaseMenu] = useState(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -434,6 +535,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       }),
       Underline,
       FontSize,
+      LineHeight,
+      Indent,
       Color,
       TextStyle,
       FontFamily,
@@ -915,6 +1018,38 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }
 
+  // 글자 크기 증가/감소 (현재 선택된 범위의 fontSize mark 를 pt 기준으로 조절)
+  const FONT_SIZE_STEPS = [8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72]
+  const stepFontSize = (dir: 1 | -1) => {
+    if (!editor) return
+    const attrs: any = editor.getAttributes('fontSize') || {}
+    const cur = parseFloat((attrs.fontSize || '11pt').replace('pt', '')) || 11
+    let idx = FONT_SIZE_STEPS.findIndex(s => s >= cur)
+    if (idx === -1) idx = FONT_SIZE_STEPS.length - 1
+    const next = FONT_SIZE_STEPS[Math.min(FONT_SIZE_STEPS.length - 1, Math.max(0, idx + dir))]
+    // @ts-ignore
+    editor.chain().focus().setFontSize(`${next}pt`).run()
+  }
+
+  // 대/소문자 변환 (선택 텍스트)
+  const changeCase = (mode: 'upper' | 'lower' | 'title' | 'sentence' | 'toggle') => {
+    if (!editor) return
+    const { from, to, empty } = editor.state.selection
+    if (empty) return
+    const text = editor.state.doc.textBetween(from, to, '\n')
+    let out = text
+    if (mode === 'upper') out = text.toUpperCase()
+    else if (mode === 'lower') out = text.toLowerCase()
+    else if (mode === 'title') out = text.replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    else if (mode === 'sentence') {
+      out = text.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase())
+    } else if (mode === 'toggle') {
+      out = text.split('').map(ch => ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase()).join('')
+    }
+    editor.chain().focus().insertContentAt({ from, to }, out).setTextSelection({ from, to: from + out.length }).run()
+    setShowCaseMenu(false)
+  }
+
   if (!editor) {
     return null
   }
@@ -993,7 +1128,21 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                       <option value="" disabled>크기</option>
                       {[8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(s => <option key={s} value={`${s}pt`}>{s}</option>)}
                     </select>
-                    <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().run()} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="서식 지우기">✕ᴬ</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(1)} className="w-6 h-6 text-xs hover:bg-blue-100 rounded" title="글자 크기 크게">A˄</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(-1)} className="w-6 h-6 text-xs hover:bg-blue-100 rounded" title="글자 크기 작게">A˅</button>
+                    <div className="relative">
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowCaseMenu(!showCaseMenu); setShowLineSpacingMenu(false) }} className="w-8 h-6 text-xs hover:bg-blue-100 rounded" title="대/소문자 바꾸기">Aa▾</button>
+                      {showCaseMenu && (
+                        <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 shadow-lg rounded mt-1 w-44 py-1 text-xs">
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('sentence')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">문장의 첫 글자만 대문자</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('lower')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">소문자로 (lowercase)</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('upper')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">대문자로 (UPPERCASE)</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('title')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">단어 첫 글자 대문자</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('toggle')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">대/소문자 전환</button>
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="서식 지우기">✕ᴬ</button>
                   </div>
                   <div className="flex items-center gap-0.5 flex-wrap">
                     <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bold') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="굵게"><strong>B</strong></button>
@@ -1029,6 +1178,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="가운데 정렬">≡</button>
                     <button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="오른쪽 정렬">⫸</button>
                     <button type="button" onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="양쪽 정렬">☰</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus() as any).outdent().run()} className="w-7 h-7 text-sm hover:bg-blue-100 rounded" title="내어쓰기">⇤</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus() as any).indent().run()} className="w-7 h-7 text-sm hover:bg-blue-100 rounded" title="들여쓰기">⇥</button>
+                    <div className="relative">
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowLineSpacingMenu(!showLineSpacingMenu); setShowCaseMenu(false) }} className="w-8 h-7 text-xs hover:bg-blue-100 rounded" title="줄 간격">↕≡</button>
+                      {showLineSpacingMenu && (
+                        <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 shadow-lg rounded mt-1 w-32 py-1 text-xs">
+                          {['1.0','1.15','1.5','2.0','2.5','3.0'].map(v => (
+                            <button key={v} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { (editor.chain().focus() as any).setLineHeight(v).run(); setShowLineSpacingMenu(false) }} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">{v}</button>
+                          ))}
+                          <div className="border-t border-gray-200 my-1"></div>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { (editor.chain().focus() as any).unsetLineHeight().run(); setShowLineSpacingMenu(false) }} className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-gray-600">기본값</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
