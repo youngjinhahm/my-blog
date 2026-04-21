@@ -2915,8 +2915,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .word-file-tab:hover { background: #1e4178; }
         .word-tab {
           position: relative;
-          padding: 7px 14px;
-          font-size: 12px;
+          padding: 8px 16px;
+          font-size: 14px;
           color: #242424;
           background: transparent;
           border: none;
@@ -2944,13 +2944,13 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin-bottom: -2px;
           white-space: nowrap;
         }
-        .word-tab-label { font-size: 12px; }
+        .word-tab-label { font-size: 14px; }
 
         /* === 리본 본문 === */
         .word-ribbon-body {
           background: #ffffff;
           border-bottom: 1px solid #d2d0ce;
-          min-height: 94px;
+          min-height: 108px;
         }
 
         /* === 그룹 (Ribbon Group) === */
@@ -2962,7 +2962,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         }
         .word-group:last-child { border-right: none; }
         .word-group-label {
-          font-size: 10px;
+          font-size: 12px;
           color: #605e5c;
           width: 100%;
           text-align: center;
@@ -2988,7 +2988,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: flex;
           align-items: stretch;
           gap: 0;
-          min-height: 94px;
+          min-height: 108px;
           padding: 0 6px;
         }
 
@@ -3029,26 +3029,26 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           align-items: center;
         }
         .word-group-label {
-          font-size: 11px;
+          font-size: 12px;
           color: #605e5c;
-          padding-top: 4px;
+          padding-top: 5px;
           text-align: center;
           width: 100%;
           font-weight: 400;
           border-top: 1px solid #f3f2f1;
-          margin-top: 2px;
+          margin-top: 3px;
         }
 
         /* === 버튼 종류 === */
-        .word-icon-24 { width: 24px; height: 24px; }
-        .word-icon-16 { width: 16px; height: 16px; flex-shrink: 0; }
+        .word-icon-24 { width: 28px; height: 28px; }
+        .word-icon-16 { width: 18px; height: 18px; flex-shrink: 0; }
         .word-num-input {
-          width: 50px;
-          height: 20px;
-          padding: 1px 3px;
+          width: 56px;
+          height: 24px;
+          padding: 2px 4px;
           border: 1px solid #8a8886;
           border-radius: 2px;
-          font-size: 11px;
+          font-size: 13px;
           background: #ffffff;
         }
         .word-num-input:focus { outline: none; border-color: #0078d4; }
@@ -3057,9 +3057,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 3px 6px 2px 6px;
-          min-width: 52px;
-          min-height: 62px;
+          padding: 4px 8px 3px 8px;
+          min-width: 60px;
+          min-height: 72px;
           border-radius: 2px;
           background: transparent;
           color: #323130;
@@ -3068,20 +3068,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         }
         .word-btn-large:hover:not(:disabled) { background: #e7e6e5; }
         .word-btn-label {
-          font-size: 11px;
-          margin-top: 2px;
-          line-height: 1.1;
+          font-size: 13px;
+          margin-top: 4px;
+          line-height: 1.15;
         }
         .word-btn-small {
           display: flex;
           align-items: center;
-          gap: 4px;
-          padding: 2px 6px;
+          gap: 5px;
+          padding: 3px 8px;
           border-radius: 2px;
           background: transparent;
           color: #323130;
-          font-size: 11px;
-          min-height: 20px;
+          font-size: 13px;
+          min-height: 24px;
           transition: background 0.08s;
         }
         .word-btn-small:hover:not(:disabled) { background: #e7e6e5; }
@@ -3090,8 +3090,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 22px;
-          height: 22px;
+          width: 26px;
+          height: 26px;
           border-radius: 2px;
           background: transparent;
           color: #323130;
@@ -3106,17 +3106,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 22px;
-          height: 22px;
+          width: 26px;
+          height: 26px;
           border-radius: 2px;
           background: transparent;
           color: #323130;
           transition: background 0.08s;
         }
         .word-btn-mini:hover { background: #e7e6e5; }
-        .word-btn-chevron { width: 30px; }
-        .word-chevron { font-size: 8px; margin-left: 2px; color: #605e5c; }
-        .word-btn-color { width: 22px; height: 22px; position: relative; cursor: pointer; overflow: hidden; }
+        .word-btn-chevron { width: 34px; }
+        .word-chevron { font-size: 10px; margin-left: 2px; color: #605e5c; }
+        .word-btn-color { width: 26px; height: 26px; position: relative; cursor: pointer; overflow: hidden; }
         .word-color-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
         /* === 폰트/크기 셀렉트 === */
@@ -3124,20 +3124,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           background: #ffffff;
           border: 1px solid #8a8886;
           border-radius: 2px;
-          font-size: 11px;
-          padding: 2px 22px 2px 6px;
-          height: 22px;
-          width: 160px;
+          font-size: 13px;
+          padding: 3px 24px 3px 8px;
+          height: 26px;
+          width: 170px;
           color: #323130;
         }
         .word-size-select {
           background: #ffffff;
           border: 1px solid #8a8886;
           border-radius: 2px;
-          font-size: 11px;
-          padding: 2px 18px 2px 6px;
-          height: 22px;
-          width: 52px;
+          font-size: 13px;
+          padding: 3px 20px 3px 8px;
+          height: 26px;
+          width: 58px;
           color: #323130;
         }
 
@@ -3190,8 +3190,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: block;
           width: 100%;
           text-align: left;
-          padding: 6px 14px;
-          font-size: 12px;
+          padding: 7px 16px;
+          font-size: 13px;
           color: #323130;
           background: transparent;
           transition: background 0.08s;
@@ -3200,8 +3200,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* === 캔버스 오버플로우 수정 === */
         .editor-canvas-normal {
-          max-height: calc(100vh - 260px);
-          min-height: 500px;
+          max-height: calc(100vh - 280px);
+          min-height: 480px;
         }
         .editor-canvas-fullscreen {
           height: calc(100vh - 240px);
