@@ -1642,11 +1642,41 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }
 
   return (
-    <div className={`border border-gray-300 rounded-lg ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
-      {/* ===== Word 스타일 리본 ===== */}
-      <div className="sticky top-0 z-20 word-ribbon border-b border-gray-300 shadow-sm">
-        {/* 탭 바 */}
-        <div className="flex items-center px-2 pt-1 border-b border-gray-200 bg-white">
+    <div className={`word-app ${isFullscreen ? 'fixed inset-0 z-50' : 'rounded-md overflow-hidden border border-[#c1c3c7]'}`}>
+      {/* ===== MS Word 365 스타일 타이틀 바 + QAT + 리본 ===== */}
+      <div className="sticky top-0 z-20 word-chrome">
+
+        {/* === Title Bar (진한 블루) === */}
+        <div className="word-titlebar flex items-center px-2 h-9 select-none">
+          {/* Quick Access Toolbar */}
+          <div className="flex items-center gap-0.5 mr-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 mr-1 rounded-sm" title="Word 문서">
+              <svg width="16" height="16" viewBox="0 0 32 32"><path fill="#fff" d="M4 4h18l6 6v18a0 0 0 0 1 0 0H4z" opacity=".3"/><path d="M4 4h18l6 6v18H4z" stroke="#fff" strokeWidth="1.4" fill="none"/><text x="10" y="22" fontFamily="Arial" fontSize="12" fontWeight="900" fill="#fff">W</text></svg>
+            </span>
+            <button type="button" onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()} className="word-qat-btn" title="실행 취소 (Ctrl+Z)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5h-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </button>
+            <button type="button" onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()} className="word-qat-btn" title="다시 실행 (Ctrl+Y)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 14l5-5-5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M20 9H9a5 5 0 00-5 5v0a5 5 0 005 5h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+
+          <div className="flex-1 text-center text-[12px] text-white/95 font-normal tracking-wide truncate">문서 1 — Word</div>
+
+          <div className="flex items-center gap-1 ml-3">
+            <button type="button" onClick={() => setIsFullscreen(!isFullscreen)} className="word-titlebar-btn" title={isFullscreen ? '창 모드' : '전체화면'}>
+              {isFullscreen ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 14h6v6M20 10h-6V4M4 14L10 8M20 10l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h6v2H6v4H4V4zM14 4h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zM18 14h2v6h-6v-2h4v-4z" fill="currentColor"/></svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* === 탭 바 (File + 홈/삽입/레이아웃/...) === */}
+        <div className="word-tabbar flex items-stretch">
+          <button type="button" className="word-file-tab" title="파일">파일</button>
           {[
             { id: 'home', label: '홈' },
             { id: 'insert', label: '삽입' },
@@ -1660,46 +1690,33 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-1.5 text-xs font-medium rounded-t transition border-b-2 ${
-                activeTab === tab.id
-                  ? (tab.contextual ? 'border-orange-500 text-orange-700 bg-orange-50' : 'border-blue-600 text-blue-700 bg-blue-50')
-                  : (tab.contextual ? 'border-transparent text-orange-600 hover:bg-orange-50' : 'border-transparent text-gray-600 hover:bg-gray-100')
-              }`}
+              className={`word-tab ${activeTab === tab.id ? 'active' : ''} ${tab.contextual ? 'contextual' : ''}`}
             >
-              {tab.contextual && <span className="text-[9px] block -mb-1 opacity-70">표 도구</span>}
-              {tab.label}
+              {tab.contextual && <span className="word-tab-context">표 도구</span>}
+              <span className="word-tab-label">{tab.label}</span>
             </button>
           ))}
           <div className="flex-1"></div>
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
-            title="전체화면"
-          >
-            {isFullscreen ? '⊟ 창모드' : '⊠ 전체화면'}
-          </button>
-          {/* wordCount 는 하단 상태바로 이동 */}
         </div>
 
-        {/* 리본 본문 - overflow visible 로 드롭다운이 아래 영역 위로 겹치게 */}
-        <div className="px-2 py-2" style={{ overflow: 'visible' }}>
+        {/* === 리본 본문 === */}
+        <div className="word-ribbon-body px-2 pt-2 pb-1" style={{ overflow: 'visible' }}>
           {/* ========== 홈 탭 ========== */}
           {activeTab === 'home' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
               {/* 클립보드 그룹 */}
-              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-2">
                 <div className="flex items-start gap-1 flex-1">
                   <div className="flex flex-col items-center gap-0.5">
                     <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="실행 취소 (Ctrl+Z)">↶</button>
                     <button type="button" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="다시 실행 (Ctrl+Y)">↷</button>
                   </div>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">실행</div>
+                <div className="word-group-label">실행</div>
               </div>
 
               {/* 글꼴 그룹 (Font) */}
-              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-2">
                 <div className="flex flex-col gap-1 flex-1">
                   <div className="flex items-center gap-1">
                     <select onChange={handleFontFamilyChange} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white w-40 font-select" defaultValue="">
@@ -1817,11 +1834,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </label>
                   </div>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">글꼴</div>
+                <div className="word-group-label">글꼴</div>
               </div>
 
               {/* 단락 그룹 (Paragraph) */}
-              <div className="flex flex-col items-center px-2 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-2">
                 <div className="flex flex-col gap-1 flex-1">
                   <div className="flex items-center gap-0.5">
                     <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="글머리 기호">•≡</button>
@@ -1850,11 +1867,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </div>
                   </div>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
+                <div className="word-group-label">단락</div>
               </div>
 
               {/* 다단계 목록 그룹 */}
-              <div className="flex flex-col items-center px-2 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-2 relative">
                 <div className="flex gap-1 flex-1 items-start">
                   <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : ''}`} title="글머리 기호">
                     <span className="text-lg leading-none">•≡</span>
@@ -1869,7 +1886,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] mt-0.5">다단계</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">목록</div>
+                <div className="word-group-label">목록</div>
                 {showMultilevelMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[240px]">
                     <div className="text-xs font-semibold text-gray-700 mb-2 px-1">다단계 목록 스타일</div>
@@ -1890,7 +1907,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 3</button>
                   <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="px-1.5 py-1 text-sm rounded hover:bg-blue-100" title="스타일 갤러리">▾</button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">스타일</div>
+                <div className="word-group-label">스타일</div>
                 {showStylesGallery && (
                   <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[420px]">
                     <div className="text-xs font-semibold text-gray-700 mb-2">스타일 갤러리</div>
@@ -1917,7 +1934,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {activeTab === 'insert' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
               {/* 표 삽입 (그리드 피커) */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex items-start flex-1 pt-1">
                   <button
                     type="button"
@@ -1929,7 +1946,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700 mt-1">표 ▾</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표</div>
+                <div className="word-group-label">표</div>
                 {showInsertGrid && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[260px]">
                     <div className="text-xs font-semibold text-gray-700 mb-2">
@@ -1978,7 +1995,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               </div>
 
               {/* 그림/미디어 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={addImage} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="이미지">
                     <span className="text-2xl">🖼️</span>
@@ -1994,11 +2011,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">구분선</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">일러스트</div>
+                <div className="word-group-label">일러스트</div>
               </div>
 
               {/* 링크 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={openHyperlinkDialog} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="하이퍼링크 (Ctrl+K)">
                     <span className="text-2xl">🔗</span>
@@ -2013,11 +2030,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">링크 카드</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">링크</div>
+                <div className="word-group-label">링크</div>
               </div>
 
               {/* 머리글/바닥글 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={() => setEditingHeaderFooter(editingHeaderFooter === 'header' ? null : 'header')} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editingHeaderFooter === 'header' ? 'bg-blue-200' : ''}`} title="머리글">
                     <span className="text-2xl">▭</span>
@@ -2032,7 +2049,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">페이지</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">머리글/바닥글</div>
+                <div className="word-group-label">머리글/바닥글</div>
                 {showPageNumberMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[200px]">
                     <button type="button" onClick={() => setPageNumber('top')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▲ 페이지 위쪽</button>
@@ -2043,7 +2060,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               </div>
 
               {/* 도형 / SmartArt / WordArt */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={() => setShowShapesMenu(!showShapesMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="도형">
                     <span className="text-2xl">◆</span>
@@ -2058,7 +2075,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">WordArt</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">일러스트</div>
+                <div className="word-group-label">일러스트</div>
                 {showShapesMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[320px]">
                     <div className="text-xs font-semibold text-gray-700 mb-2">도형</div>
@@ -2100,7 +2117,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               </div>
 
               {/* 기호 / 수식 / 페이지 나누기 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={() => setShowSymbolPicker(!showSymbolPicker)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="기호">
                     <span className="text-2xl">Ω</span>
@@ -2115,7 +2132,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">페이지 나눔</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">기호</div>
+                <div className="word-group-label">기호</div>
                 {showSymbolPicker && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[380px] max-h-[260px] overflow-auto">
                     <div className="text-xs font-semibold text-gray-700 mb-2">기호 삽입</div>
@@ -2134,7 +2151,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {activeTab === 'layout' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
               {/* 페이지 설정 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex items-start gap-2 flex-1">
                   <button type="button" onClick={() => setShowMarginsMenu(!showMarginsMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="여백">
                     <span className="text-2xl">▤</span>
@@ -2157,7 +2174,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">나누기</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">페이지 설정</div>
+                <div className="word-group-label">페이지 설정</div>
 
                 {showMarginsMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[260px]">
@@ -2208,7 +2225,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               </div>
 
               {/* 단락 - 들여쓰기/간격 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 text-[11px] text-gray-700">
                   <label className="flex items-center gap-1">왼쪽:
                     <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentLeft(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
@@ -2227,17 +2244,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[9px]">px</span>
                   </label>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
+                <div className="word-group-label">단락</div>
               </div>
 
               {/* 현재 설정 표시 */}
-              <div className="flex flex-col items-center px-3">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex flex-col gap-1 flex-1 text-[11px] text-gray-600">
                   <div>용지: <b>{pageSize}</b> {pageOrientation === 'portrait' ? '세로' : '가로'}</div>
                   <div>여백: {pageMargins.top} / {pageMargins.right} / {pageMargins.bottom} / {pageMargins.left}</div>
                   <div>단: {pageColumns}개</div>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">현재 상태</div>
+                <div className="word-group-label">현재 상태</div>
               </div>
             </div>
           )}
@@ -2246,7 +2263,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {activeTab === 'tableDesign' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
               {/* 표 스타일 옵션 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 flex-1">
                   {[
                     { cls: 'header-row', label: '머리글 행' },
@@ -2266,11 +2283,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </label>
                   ))}
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표 스타일 옵션</div>
+                <div className="word-group-label">표 스타일 옵션</div>
               </div>
 
               {/* 표 스타일 갤러리 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 min-w-[340px]">
+              <div className="word-group flex flex-col items-center px-3 min-w-[340px]">
                 <div className="flex-1 w-full overflow-x-auto">
                   <div className="flex gap-1.5">
                     {[
@@ -2300,18 +2317,18 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     ))}
                   </div>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">표 스타일</div>
+                <div className="word-group-label">표 스타일</div>
               </div>
 
               {/* 셀 음영 (Shading) */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-3 relative">
                 <div className="flex-1 flex items-start pt-1">
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowShadingMenu(!showShadingMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="셀 음영">
                     <span className="text-2xl">🎨</span>
                     <span className="text-[10px] text-gray-700">음영 ▾</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">음영</div>
+                <div className="word-group-label">음영</div>
                 {showShadingMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-56">
                     <div className="text-xs font-semibold text-gray-700 mb-1">표준 색</div>
@@ -2331,7 +2348,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               </div>
 
               {/* 선 스타일 (Line Style) */}
-              <div className="flex flex-col items-center px-2 border-r border-gray-300 relative">
+              <div className="word-group flex flex-col items-center px-2 relative">
                 <div className="flex-1 flex flex-col items-stretch gap-1 pt-1 min-w-[110px]">
                   <button
                     type="button"
@@ -2407,7 +2424,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </span>
                   </label>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">테두리 스타일</div>
+                <div className="word-group-label">테두리 스타일</div>
               </div>
 
               {/* 테두리 (Borders) 드롭다운 */}
@@ -2418,7 +2435,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">테두리 ▾</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">테두리</div>
+                <div className="word-group-label">테두리</div>
                 {showBordersMenu && (
                   <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-52">
                     <div className="text-[10px] text-gray-500 mb-1 px-1">
@@ -2454,7 +2471,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {activeTab === 'tableLayout' && (
             <div className="flex items-stretch gap-0 min-h-[92px]">
               {/* 삭제 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-1 flex-1">
                   <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="flex flex-col items-center px-2 py-1 hover:bg-red-50 rounded text-red-600" title="행 삭제">
                     <span className="text-lg">⊖</span>
@@ -2469,11 +2486,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px]">표 삭제</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">삭제</div>
+                <div className="word-group-label">삭제</div>
               </div>
 
               {/* 행 및 열 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-1 flex-1">
                   <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
                     <span className="text-lg">⬆</span>
@@ -2492,11 +2509,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px]">오른쪽 삽입</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">행 및 열</div>
+                <div className="word-group-label">행 및 열</div>
               </div>
 
               {/* 병합 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-1 flex-1">
                   <button type="button" onClick={() => editor.chain().focus().mergeCells().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
                     <span className="text-lg">⊞</span>
@@ -2507,11 +2524,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px]">셀 분할</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">병합</div>
+                <div className="word-group-label">병합</div>
               </div>
 
               {/* 머리글 토글 */}
-              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-1 flex-1">
                   <button type="button" onClick={() => editor.chain().focus().toggleHeaderRow().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
                     <span className="text-lg">⊤</span>
@@ -2526,11 +2543,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px]">머리글 셀</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">머리글</div>
+                <div className="word-group-label">머리글</div>
               </div>
 
               {/* 맞춤 */}
-              <div className="flex flex-col items-center px-3">
+              <div className="word-group flex flex-col items-center px-3">
                 <div className="flex items-start gap-1 flex-1">
                   <button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded">
                     <span className="text-lg">⫷</span>
@@ -2545,7 +2562,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px]">오른쪽</span>
                   </button>
                 </div>
-                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">맞춤</div>
+                <div className="word-group-label">맞춤</div>
               </div>
             </div>
           )}
@@ -2721,16 +2738,16 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       </div>
 
       {/* === Word 스타일 하단 상태바 (Status Bar) === */}
-      <div className="flex items-center gap-3 px-4 py-1.5 text-[11px] text-gray-700 border-t border-gray-300 bg-gradient-to-b from-[#f3f4f6] to-[#e5e7eb]">
+      <div className="word-statusbar flex items-center gap-3 px-4 py-1 text-[11px] border-t">
         <div className="flex items-center gap-1">
           <span className="font-semibold">📄 페이지</span>
           <span className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-gray-800 font-medium tabular-nums">{currentPage} / {totalPages}</span>
         </div>
-        <div className="w-px h-4 bg-gray-400"></div>
+        <div className="word-statusbar-sep"></div>
         <div className="flex items-center gap-1">
           <span>단어: <b className="tabular-nums">{wordCount.toLocaleString()}</b></span>
         </div>
-        <div className="w-px h-4 bg-gray-400"></div>
+        <div className="word-statusbar-sep"></div>
         <div className="flex items-center gap-1">
           <span>글자: <b className="tabular-nums">{charCount.toLocaleString()}</b></span>
         </div>
@@ -2738,7 +2755,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         <div className="flex items-center gap-2">
           <span className="text-gray-500">💡 Ctrl+Z/B/I/U, Ctrl+K 링크</span>
         </div>
-        <div className="w-px h-4 bg-gray-400"></div>
+        <div className="word-statusbar-sep"></div>
         {/* Zoom 컨트롤 */}
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setZoomLevel(Math.max(25, zoomLevel - 10))} className="w-6 h-5 flex items-center justify-center hover:bg-blue-200 rounded text-sm font-bold" title="축소">−</button>
@@ -2775,13 +2792,196 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           color: #1f2937;
         }
 
+        /* ============================================
+           MS Word 365 정확 재현 - 전체 셸
+           ============================================ */
+        .word-app {
+          background: #f3f2f1;
+          font-family: 'Segoe UI', 'Malgun Gothic', '맑은 고딕', -apple-system, sans-serif;
+          font-size: 12px;
+          color: #242424;
+        }
+
+        /* === Title Bar (Word 블루) === */
+        .word-titlebar {
+          background: #2b579a;
+          color: #fff;
+          border-bottom: 1px solid #1e4178;
+        }
+        .word-qat-btn {
+          width: 24px; height: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          border-radius: 3px;
+          transition: background 0.08s;
+        }
+        .word-qat-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+        .word-qat-btn:disabled { opacity: 0.4; }
+        .word-titlebar-btn {
+          width: 28px; height: 26px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          border-radius: 2px;
+          transition: background 0.08s;
+        }
+        .word-titlebar-btn:hover { background: rgba(255,255,255,0.15); }
+
+        /* === Tab Bar === */
+        .word-tabbar {
+          background: #f3f2f1;
+          border-bottom: 1px solid #e1dfdd;
+          padding-left: 0;
+        }
+        .word-file-tab {
+          background: #2b579a;
+          color: #fff;
+          padding: 7px 18px;
+          font-size: 12px;
+          font-weight: 400;
+          border-top-right-radius: 0;
+          transition: background 0.08s;
+        }
+        .word-file-tab:hover { background: #1e4178; }
+        .word-tab {
+          position: relative;
+          padding: 7px 14px;
+          font-size: 12px;
+          color: #242424;
+          background: transparent;
+          border: none;
+          border-bottom: 2px solid transparent;
+          cursor: pointer;
+          transition: background 0.08s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          line-height: 1.1;
+        }
+        .word-tab:hover:not(.active) { background: #e5e4e2; }
+        .word-tab.active {
+          background: #ffffff;
+          border-bottom: 2px solid #2b579a;
+          color: #2b579a;
+          font-weight: 500;
+        }
+        .word-tab.contextual { color: #c05100; }
+        .word-tab.contextual.active { background: #fff4ec; border-bottom-color: #c05100; color: #c05100; }
+        .word-tab-context {
+          font-size: 9px;
+          opacity: 0.7;
+          margin-bottom: -2px;
+          white-space: nowrap;
+        }
+        .word-tab-label { font-size: 12px; }
+
+        /* === 리본 본문 === */
+        .word-ribbon-body {
+          background: #ffffff;
+          border-bottom: 1px solid #d2d0ce;
+          min-height: 94px;
+        }
+
+        /* === 그룹 (Ribbon Group) === */
+        .word-group {
+          padding-top: 2px;
+          padding-bottom: 0;
+          position: relative;
+          border-right: 1px solid #e1dfdd;
+        }
+        .word-group:last-child { border-right: none; }
+        .word-group-label {
+          font-size: 10px;
+          color: #605e5c;
+          width: 100%;
+          text-align: center;
+          padding-top: 2px;
+          margin-top: 2px;
+          font-weight: 400;
+          letter-spacing: 0.2px;
+        }
+
+        /* === 리본 버튼 hover/active === */
+        .word-ribbon-body button:hover:not(:disabled):not([class*="bg-blue-"]) {
+          background-color: #e7e6e5 !important;
+          border-radius: 2px;
+        }
+        .word-ribbon-body button[class*="bg-blue-200"] {
+          background-color: #c7e0f4 !important;
+          box-shadow: inset 0 0 0 1px #0078d4;
+          border-radius: 2px;
+        }
+
+        /* === 하단 상태바 (Word 블루) === */
+        .word-statusbar {
+          background: #2b579a;
+          color: #ffffff;
+          border-color: #1e4178;
+        }
+        .word-statusbar b { color: #ffffff; font-weight: 600; }
+        .word-statusbar-sep {
+          width: 1px; height: 14px;
+          background: rgba(255,255,255,0.3);
+        }
+        .word-statusbar button {
+          color: #ffffff;
+        }
+        .word-statusbar button:hover {
+          background: rgba(255,255,255,0.18) !important;
+        }
+        .word-statusbar span.bg-white,
+        .word-statusbar .bg-white {
+          background: rgba(255,255,255,0.18) !important;
+          color: #ffffff !important;
+          border-color: rgba(255,255,255,0.35) !important;
+        }
+        .word-statusbar input[type="range"] { accent-color: #ffffff; }
+
+        /* === 인풋/셀렉트 스타일 === */
+        .word-ribbon-body select,
+        .word-ribbon-body input[type="text"],
+        .word-ribbon-body input[type="number"],
+        .word-ribbon-body input[type="url"] {
+          background: #ffffff;
+          border: 1px solid #8a8886;
+          border-radius: 2px;
+          font-size: 11px;
+          color: #242424;
+          transition: border-color 0.08s, box-shadow 0.08s;
+        }
+        .word-ribbon-body select:hover,
+        .word-ribbon-body input:hover { border-color: #323130; }
+        .word-ribbon-body select:focus,
+        .word-ribbon-body input:focus {
+          border-color: #0078d4;
+          box-shadow: 0 0 0 1px #0078d4;
+          outline: none;
+        }
+
+
+          font-size: 11pt;
+          line-height: 1.5;
+          color: #1f2937;
+        }
+
         /* === Word 스타일 캔버스 === */
         .editor-canvas {
-          background: #e5e7eb;
-          padding: 20px 4px;
+          background: #f3f2f1;
+          padding: 24px 4px 32px 4px;
           overflow-x: auto;
           overflow-y: auto;
         }
+        .editor-page {
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+          border: 1px solid #d2d0ce;
+        }
+        .editor-page.editor-page { background: #ffffff; }
+
         .editor-zoom-wrapper {
           transition: transform 0.15s ease-out;
           margin: 0 auto;
@@ -2801,30 +3001,6 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* Font dropdown options: preview each font in its actual typeface */
         .font-select option { padding: 4px 8px; }
-
-        /* Word 스타일 리본 */
-        .word-ribbon {
-          background: linear-gradient(to bottom, #fafbfc 0%, #f3f4f6 70%, #e8eaed 100%);
-          border-bottom: 1px solid #c1c3c7;
-        }
-        .word-ribbon button {
-          transition: background 0.08s ease, border-color 0.08s ease;
-        }
-        .word-ribbon select, .word-ribbon input[type="text"], .word-ribbon input[type="number"], .word-ribbon input[type="url"] {
-          background: #ffffff;
-          border: 1px solid #d1d5db;
-          transition: border-color 0.08s ease, box-shadow 0.08s ease;
-        }
-        .word-ribbon select:hover, .word-ribbon select:focus,
-        .word-ribbon input:hover, .word-ribbon input:focus {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
-          outline: none;
-        }
-        .word-ribbon button[class*="hover:bg-blue-100"]:hover {
-          background-color: #e0ecff !important;
-          box-shadow: inset 0 0 0 1px #bfdbfe;
-        }
 
         /* Word-like scrollbar */
         .editor-canvas::-webkit-scrollbar { width: 14px; height: 14px; }
