@@ -100,6 +100,7 @@ const StyledTableHeader = TableHeader.extend({
 })
 import { useRef, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ChartDialog from './ChartDialog'
 
 // 커스텀 FontSize Mark
 const FontSize = Mark.create({
@@ -516,6 +517,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [penColor, setPenColor] = useState('#374151')
   const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false)
   const [showCaseMenu, setShowCaseMenu] = useState(false)
+  const [showChartDialog, setShowChartDialog] = useState(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -934,6 +936,33 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }
 
+  const uploadImageAndGetUrl = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('blog-images')
+      .upload(filePath, file)
+
+    if (uploadError) {
+      alert('이미지 업로드 실패: ' + uploadError.message)
+      return null
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('blog-images')
+      .getPublicUrl(filePath)
+
+    return publicUrl
+  }
+
+  const handleChartInsert = async (imageUrl: string) => {
+    if (editor) {
+      editor.chain().focus().setImage({ src: imageUrl }).run()
+    }
+  }
+
   const addImage = () => {
     fileInputRef.current?.click()
   }
@@ -1278,6 +1307,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     <span className="text-[10px] text-gray-700">그림</span>
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  <button type="button" onClick={() => setShowChartDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="차트">
+                    <span className="text-2xl">📊</span>
+                    <span className="text-[10px] text-gray-700">차트</span>
+                  </button>
                   <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="구분선">
                     <span className="text-2xl">―</span>
                     <span className="text-[10px] text-gray-700">구분선</span>
@@ -1655,6 +1688,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
         💡 팁: Ctrl+Z 되돌리기, Ctrl+B 굵게, Ctrl+I 기울임, Ctrl+U 밑줄 | 🔗 링크 = 텍스트 링크, 📎 링크 카드 = 썸네일
       </div>
+
+      {/* 차트 삽입 다이얼로그 */}
+      <ChartDialog
+        isOpen={showChartDialog}
+        onClose={() => setShowChartDialog(false)}
+        onInsert={handleChartInsert}
+        supabaseUpload={uploadImageAndGetUrl}
+      />
 
       {/* CSS */}
       <style jsx global>{`
