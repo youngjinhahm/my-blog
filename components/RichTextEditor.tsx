@@ -197,32 +197,61 @@ const LineHeight = Extension.create({
   },
 })
 
-// 단락 들여쓰기 Extension (Word Increase/Decrease Indent)
+// 단락 들여쓰기 / 단락 간격 Extension (Word Indent + Spacing Before/After + Right Indent)
 const Indent = Extension.create({
   name: 'indent',
   addOptions() {
     return {
       types: ['paragraph', 'heading'],
-      step: 24, // px
-      max: 240,
+      step: 24,
+      max: 480,
     }
   },
   addGlobalAttributes() {
+    const buildStyle = (attrs: any) => {
+      const parts: string[] = []
+      if (attrs.indent) parts.push(`margin-left: ${attrs.indent}px`)
+      if (attrs.indentRight) parts.push(`margin-right: ${attrs.indentRight}px`)
+      if (attrs.spaceBefore) parts.push(`margin-top: ${attrs.spaceBefore}px`)
+      if (attrs.spaceAfter) parts.push(`margin-bottom: ${attrs.spaceAfter}px`)
+      return parts.join('; ')
+    }
+    const parseCss = (el: HTMLElement, key: string) => {
+      const v = (el.style as any)[key]
+      if (!v) return 0
+      const n = parseInt(v, 10)
+      return isNaN(n) ? 0 : n
+    }
     return [
       {
         types: this.options.types,
         attributes: {
           indent: {
             default: 0,
-            parseHTML: (element: HTMLElement) => {
-              const ml = element.style.marginLeft
-              if (!ml) return 0
-              const n = parseInt(ml, 10)
-              return isNaN(n) ? 0 : n
-            },
+            parseHTML: (el: HTMLElement) => parseCss(el, 'marginLeft'),
+            renderHTML: () => ({}),
+          },
+          indentRight: {
+            default: 0,
+            parseHTML: (el: HTMLElement) => parseCss(el, 'marginRight'),
+            renderHTML: () => ({}),
+          },
+          spaceBefore: {
+            default: 0,
+            parseHTML: (el: HTMLElement) => parseCss(el, 'marginTop'),
+            renderHTML: () => ({}),
+          },
+          spaceAfter: {
+            default: 0,
+            parseHTML: (el: HTMLElement) => parseCss(el, 'marginBottom'),
+            renderHTML: () => ({}),
+          },
+          _indentStyle: {
+            default: null,
+            parseHTML: () => null,
             renderHTML: (attributes: any) => {
-              if (!attributes.indent) return {}
-              return { style: `margin-left: ${attributes.indent}px` }
+              const s = buildStyle(attributes)
+              return s ? { style: s } : {}
             },
           },
         },
@@ -231,6 +260,12 @@ const Indent = Extension.create({
   },
   addCommands() {
     const { step, max, types } = this.options
+    const updateIfPara = (key: string, value: number) => ({ state, commands }: any) => {
+      const { selection } = state
+      const node = selection.$from.node(selection.$from.depth)
+      if (!node || !types.includes(node.type.name)) return false
+      return commands.updateAttributes(node.type.name, { [key]: value })
+    }
     return {
       indent: () => ({ state, commands }: any) => {
         const { selection } = state
@@ -246,6 +281,77 @@ const Indent = Extension.create({
         const next = Math.max((node.attrs.indent || 0) - step, 0)
         return commands.updateAttributes(node.type.name, { indent: next })
       },
+      setIndent: (px: number) => updateIfPara('indent', px),
+      setIndentRight: (px: number) => updateIfPara('indentRight', px),
+      setSpaceBefore: (px: number) => updateIfPara('spaceBefore', px),
+      setSpaceAfter: (px: number) => updateIfPara('spaceAfter', px),
+    } as any
+  },
+})
+
+// Page Break Node
+const PageBreak = Node.create({
+  name: 'pageBreak',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { kind: { default: 'page' } }
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-page-break]' }]
+  },
+  renderHTML({ node }) {
+    const kind = node.attrs.kind || 'page'
+    const label = kind === 'column' ? '단 나누기' : '페이지 나누기'
+    return ['div', { 'data-page-break': '', class: 'page-break', style: 'margin: 12px 0; padding: 8px 0; text-align: center; border-top: 1px dashed #cbd5e0;' }, ['span', { style: 'font-size: 11px; color: #a0aec0;' }, label]]
+  },
+  addCommands() {
+    return {
+      insertPageBreak: () => ({ commands }: any) => commands.insertContent({ type: this.name, attrs: { kind: 'page' } }),
+      insertColumnBreak: () => ({ commands }: any) => commands.insertContent({ type: this.name, attrs: { kind: 'column' } }),
+    } as any
+  },
+})
+
+// Bookmark Node
+const Bookmark = Node.create({
+  name: 'bookmark',
+  group: 'inline',
+  atom: true,
+  inline: true,
+  selectable: true,
+  addAttributes() {
+    return { id: { default: '' } }
+  },
+  parseHTML() {
+    return [{ tag: 'a[data-bookmark]' }]
+  },
+  renderHTML({ node }) {
+    return ['a', { id: node.attrs.id, 'data-bookmark': node.attrs.id, class: 'bookmark', href: '#' + node.attrs.id }, '🔖']
+  },
+  addCommands() {
+    return {
+      setBookmark: (id: string) => ({ commands }: any) => commands.insertContent({ type: this.name, attrs: { id } }),
+    } as any
+  },
+})
+
+// TextBox Node
+const TextBox = Node.create({
+  name: 'textBox',
+  group: 'block',
+  content: 'paragraph+',
+  draggable: true,
+  parseHTML() {
+    return [{ tag: 'div[data-text-box]' }]
+  },
+  renderHTML() {
+    return ['div', { 'data-text-box': '', class: 'text-box', style: 'border: 1px solid #cbd5e0; padding: 12px; background: rgba(255, 251, 230, 0.5);' }, ['div', {}, 0]]
+  },
+  addCommands() {
+    return {
+      insertTextBox: () => ({ commands }: any) => commands.insertContent({ type: this.name, content: [{ type: 'paragraph' }] }),
     } as any
   },
 })
@@ -504,7 +610,45 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [fetchingPreview, setFetchingPreview] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [wordCount, setWordCount] = useState(0)
-  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'tableDesign' | 'tableLayout'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout' | 'tableDesign' | 'tableLayout'>('home')
+  const [showFindReplace, setShowFindReplace] = useState(false)
+  const [findText, setFindText] = useState('')
+  const [replaceText, setReplaceText] = useState('')
+  const [matchCase, setMatchCase] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const [painterMode, setPainterMode] = useState(false)
+  const [painterLocked, setPainterLocked] = useState(false)
+  const [painterMarks, setPainterMarks] = useState<any>(null)
+  const [pageHeaderText, setPageHeaderText] = useState('')
+  const [pageFooterText, setPageFooterText] = useState('')
+  const [editingHeaderFooter, setEditingHeaderFooter] = useState<'header' | 'footer' | null>(null)
+  const [headerFooterInput, setHeaderFooterInput] = useState('')
+  const [pageMargins, setPageMargins] = useState({ top: '1.27cm', right: '1.27cm', bottom: '1.27cm', left: '1.27cm' })
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const [pageSize, setPageSize] = useState<'A4' | 'Letter' | 'Legal' | 'A3' | 'A5'>('A4')
+  const [pageColumns, setPageColumns] = useState<1 | 2 | 3>(1)
+  const [showSymbolPicker, setShowSymbolPicker] = useState(false)
+  const [showEquationDialog, setShowEquationDialog] = useState(false)
+  const [equationLatex, setEquationLatex] = useState('')
+  const [showStylesGallery, setShowStylesGallery] = useState(false)
+  const [showMultilevelMenu, setShowMultilevelMenu] = useState(false)
+  const [showShapesMenu, setShowShapesMenu] = useState(false)
+  const [showSmartArtMenu, setShowSmartArtMenu] = useState(false)
+  const [showWordArtMenu, setShowWordArtMenu] = useState(false)
+  const [showPageNumberMenu, setShowPageNumberMenu] = useState(false)
+  const [showBookmarkDialog, setShowBookmarkDialog] = useState(false)
+  const [bookmarkInput, setBookmarkInput] = useState('')
+  const [showHyperlinkDialog, setShowHyperlinkDialog] = useState(false)
+  const [hyperlinkText, setHyperlinkText] = useState('')
+  const [hyperlinkHref, setHyperlinkHref] = useState('')
+  const [hyperlinkNewTab, setHyperlinkNewTab] = useState(true)
+  const [showMarginsMenu, setShowMarginsMenu] = useState(false)
+  const [showCustomMargins, setShowCustomMargins] = useState(false)
+  const [showOrientationMenu, setShowOrientationMenu] = useState(false)
+  const [showSizeMenu, setShowSizeMenu] = useState(false)
+  const [showColumnsMenu, setShowColumnsMenu] = useState(false)
+  const [showBreaksMenu, setShowBreaksMenu] = useState(false)
+
   const [showInsertGrid, setShowInsertGrid] = useState(false)
   const [hoverRow, setHoverRow] = useState(0)
   const [hoverCol, setHoverCol] = useState(0)
@@ -565,6 +709,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       TableRow,
       StyledTableHeader,
       StyledTableCell,
+      PageBreak,
+      Bookmark,
+      TextBox,
       Placeholder.configure({
         placeholder: '글 내용을 작성하세요...',
       }),
@@ -584,6 +731,31 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         class: 'prose prose-sm sm:prose lg:prose-lg max-w-none focus:outline-none min-h-[26cm]',
       },
       handleKeyDown: (view, event) => {
+        // Ctrl+F = Find
+        if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+          event.preventDefault()
+          setShowFindReplace(!showFindReplace)
+          return true
+        }
+        // Ctrl+Enter = Page Break
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault()
+          editor && (editor as any).chain().focus().insertPageBreak().run()
+          return true
+        }
+        // Escape = Clear painter mode
+        if (event.key === 'Escape') {
+          if (painterMode) {
+            setPainterMode(false)
+            setPainterMarks(null)
+            return true
+          }
+          if (showFindReplace) {
+            setShowFindReplace(false)
+            return true
+          }
+        }
+
         // 표 안에서는 기본 Enter 동작 유지 (셀 내부 줄바꿈)
         const { $from } = view.state.selection
         let inTable = false
@@ -1153,7 +1325,60 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editor.chain().focus().setFontSize(`${next}pt`).run()
   }
 
-  // 대/소문자 변환 (선택 텍스트)
+    const applyPainterMarks = () => {
+    if (!editor || !painterMarks || editor.state.selection.empty) return
+    const chain = editor.chain().focus()
+    if (painterMarks.bold) chain.setBold()
+    if (painterMarks.italic) chain.setItalic()
+    if (painterMarks.underline) chain.setUnderline()
+    if (painterMarks.strike) chain.setStrike()
+    if (painterMarks.color) chain.setColor(painterMarks.color)
+    chain.run()
+    if (!painterLocked) {
+      setPainterMode(false)
+      setPainterMarks(null)
+    }
+  }
+
+  const findMatches = (): Array<{ from: number; to: number }> => {
+    if (!editor || !findText) return []
+    const matches: Array<{ from: number; to: number }> = []
+    const text = editor.state.doc.textContent
+    const searchStr = matchCase ? findText : findText.toLowerCase()
+    const docStr = matchCase ? text : text.toLowerCase()
+    let index = 0
+    while ((index = docStr.indexOf(searchStr, index)) !== -1) {
+      matches.push({ from: index, to: index + searchStr.length })
+      index += 1
+    }
+    return matches
+  }
+
+  const insertEquation = () => {
+    if (!editor || !equationLatex) return
+    const url = 'https://latex.codecogs.com/svg.image?' + encodeURIComponent(equationLatex)
+    editor.chain().focus().setImage({ src: url }).run()
+    setEquationLatex('')
+    setShowEquationDialog(false)
+  }
+
+  const insertSymbol = (symbol: string) => {
+    if (!editor) return
+    editor.chain().focus().insertContent(symbol).run()
+    setShowSymbolPicker(false)
+  }
+
+  const pageSizeDims: Record<string, [number, number]> = {
+    'A4': [21, 29.7], 'A3': [29.7, 42], 'A5': [14.8, 21], 'Letter': [21.59, 27.94], 'Legal': [21.59, 35.56],
+  }
+
+  const getPageDims = () => {
+    const [w, h] = pageSizeDims[pageSize]
+    if (pageOrientation === 'landscape') return { width: h, height: w }
+    return { width: w, height: h }
+  }
+
+// 대/소문자 변환 (선택 텍스트)
   const changeCase = (mode: 'upper' | 'lower' | 'title' | 'sentence' | 'toggle') => {
     if (!editor) return
     const { from, to, empty } = editor.state.selection
@@ -1172,6 +1397,198 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     setShowCaseMenu(false)
   }
 
+
+  // === MS Word 스타일 헬퍼 ===
+  const applyStyle = (style: string) => {
+    if (!editor) return
+    const chain: any = editor.chain().focus()
+    // 모든 기존 스타일 마크/블록 초기화 후 적용
+    if (style === 'normal') {
+      chain.setParagraph().unsetAllMarks().unsetColor().run()
+    } else if (style === 'h1') {
+      chain.setHeading({ level: 1 }).run()
+    } else if (style === 'h2') {
+      chain.setHeading({ level: 2 }).run()
+    } else if (style === 'h3') {
+      chain.setHeading({ level: 3 }).run()
+    } else if (style === 'h4') {
+      chain.setHeading({ level: 4 }).run()
+    } else if (style === 'title') {
+      chain.setHeading({ level: 1 }).setColor('#1f2937').run()
+    } else if (style === 'subtitle') {
+      chain.setHeading({ level: 2 }).setColor('#6b7280').run()
+    } else if (style === 'quote') {
+      chain.setBlockquote().run()
+    } else if (style === 'code') {
+      chain.toggleCodeBlock().run()
+    } else if (style === 'emphasis') {
+      chain.toggleItalic().run()
+    } else if (style === 'strong') {
+      chain.toggleBold().run()
+    }
+    setShowStylesGallery(false)
+  }
+
+  const applyMultilevel = (kind: string) => {
+    if (!editor) return
+    if (kind === 'ordered') {
+      editor.chain().focus().toggleOrderedList().run()
+    } else if (kind === 'bullet') {
+      editor.chain().focus().toggleBulletList().run()
+    } else if (kind === 'decimal') {
+      editor.chain().focus().toggleOrderedList().updateAttributes('orderedList', { _listStyle: 'decimal' }).run()
+    } else if (kind === 'alpha') {
+      editor.chain().focus().toggleOrderedList().run()
+      setTimeout(() => editor.chain().focus().updateAttributes('orderedList', { _listStyle: 'lower-alpha' }).run(), 0)
+    } else if (kind === 'roman') {
+      editor.chain().focus().toggleOrderedList().run()
+      setTimeout(() => editor.chain().focus().updateAttributes('orderedList', { _listStyle: 'lower-roman' }).run(), 0)
+    }
+    setShowMultilevelMenu(false)
+  }
+
+  const insertShape = (shape: string) => {
+    if (!editor) return
+    const color = penColor || '#2563eb'
+    const shapes: Record<string, string> = {
+      rect: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80"><rect x="4" y="4" width="112" height="72" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      circle: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      triangle: `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="100" viewBox="0 0 110 100"><polygon points="55,6 104,94 6,94" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      arrow: `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="50" viewBox="0 0 140 50"><path d="M4 25 L110 25 M90 10 L115 25 L90 40" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+      star: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><polygon points="50,6 62,38 96,38 68,58 78,92 50,72 22,92 32,58 4,38 38,38" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      diamond: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><polygon points="50,6 94,50 50,94 6,50" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      pentagon: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><polygon points="50,6 94,40 78,94 22,94 6,40" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      hexagon: `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="100" viewBox="0 0 110 100"><polygon points="30,6 80,6 104,50 80,94 30,94 6,50" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      line: `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="20" viewBox="0 0 140 20"><line x1="4" y1="10" x2="136" y2="10" stroke="${color}" stroke-width="3" stroke-linecap="round"/></svg>`,
+      callout: `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100" viewBox="0 0 160 100"><path d="M8 8 H152 V64 H52 L32 92 L40 64 H8 Z" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/></svg>`,
+      heart: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="90" viewBox="0 0 100 90"><path d="M50 82 C50 82 8 56 8 30 C8 18 18 8 30 8 C38 8 46 12 50 20 C54 12 62 8 70 8 C82 8 92 18 92 30 C92 56 50 82 50 82 Z" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+      cloud: `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80"><path d="M40 60 Q20 60 20 44 Q20 28 38 28 Q40 12 58 12 Q76 12 80 26 Q96 22 104 34 Q124 36 124 50 Q124 64 108 66 L40 60 Z" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/></svg>`,
+    }
+    const svg = shapes[shape] || shapes.rect
+    const dataUri = 'data:image/svg+xml;base64,' + (typeof btoa !== 'undefined' ? btoa(svg) : Buffer.from(svg).toString('base64'))
+    editor.chain().focus().setImage({ src: dataUri }).run()
+    setShowShapesMenu(false)
+  }
+
+  const insertSmartArt = (kind: string) => {
+    if (!editor) return
+    let html = ''
+    if (kind === 'process') {
+      html = '<div class="smartart smartart-process" data-smartart="process"><div class="sa-box">1단계</div><div class="sa-arrow">▶</div><div class="sa-box">2단계</div><div class="sa-arrow">▶</div><div class="sa-box">3단계</div></div><p></p>'
+    } else if (kind === 'hierarchy') {
+      html = '<div class="smartart smartart-hier" data-smartart="hierarchy"><div class="sa-top">조직장</div><div class="sa-row"><div class="sa-box">팀 A</div><div class="sa-box">팀 B</div><div class="sa-box">팀 C</div></div></div><p></p>'
+    } else if (kind === 'cycle') {
+      html = '<div class="smartart smartart-cycle" data-smartart="cycle"><div class="sa-cbox">계획</div><div class="sa-carrow">⤻</div><div class="sa-cbox">실행</div><div class="sa-carrow">⤻</div><div class="sa-cbox">검토</div><div class="sa-carrow">⤻</div><div class="sa-cbox">개선</div></div><p></p>'
+    } else if (kind === 'list') {
+      html = '<div class="smartart smartart-list" data-smartart="list"><div class="sa-litem"><span class="sa-idx">1</span> 항목 하나</div><div class="sa-litem"><span class="sa-idx">2</span> 항목 둘</div><div class="sa-litem"><span class="sa-idx">3</span> 항목 셋</div></div><p></p>'
+    } else if (kind === 'relation') {
+      html = '<div class="smartart smartart-rel" data-smartart="relation"><div class="sa-rbox">A</div><div class="sa-rbox">B</div><div class="sa-rbox">C</div></div><p></p>'
+    } else if (kind === 'pyramid') {
+      html = '<div class="smartart smartart-pyr" data-smartart="pyramid"><div class="sa-pyr sa-pyr1">최상위</div><div class="sa-pyr sa-pyr2">중간층</div><div class="sa-pyr sa-pyr3">기초 계층</div></div><p></p>'
+    }
+    editor.chain().focus().insertContent(html).run()
+    setShowSmartArtMenu(false)
+  }
+
+  const insertWordArt = (style: string) => {
+    if (!editor) return
+    const text = window.prompt('WordArt 텍스트를 입력하세요', '제목')
+    if (!text) return
+    const cls = 'wordart wordart-' + style
+    editor.chain().focus().insertContent(`<span class="${cls}">${text}</span>`).run()
+    setShowWordArtMenu(false)
+  }
+
+  const setPageNumber = (pos: string) => {
+    if (!editor) return
+    const marker = pos === 'top' ? '페이지 상단' : pos === 'bottom' ? '페이지 하단' : '현재 위치'
+    // Word의 페이지 번호는 인쇄시 CSS counter 로 처리되므로 헤더/푸터 텍스트에 적용
+    if (pos === 'top') {
+      setPageHeaderText((p) => (p ? p + ' - ' : '') + '- {페이지} -')
+    } else if (pos === 'bottom') {
+      setPageFooterText((p) => (p ? p + ' - ' : '') + '- {페이지} -')
+    } else {
+      editor.chain().focus().insertContent('<span class="page-number" data-pn="inline">1</span>').run()
+    }
+    setShowPageNumberMenu(false)
+  }
+
+  const insertBookmarkNow = () => {
+    if (!editor) return
+    const id = bookmarkInput.trim()
+    if (!id) return
+    ;(editor.chain().focus() as any).insertContent({ type: 'bookmark', attrs: { id } }).run()
+    setBookmarkInput('')
+    setShowBookmarkDialog(false)
+  }
+
+  const openHyperlinkDialog = () => {
+    if (!editor) return
+    const { from, to, empty } = editor.state.selection
+    const selectedText = empty ? '' : editor.state.doc.textBetween(from, to, ' ')
+    const existing = editor.getAttributes('link')?.href || ''
+    setHyperlinkText(selectedText)
+    setHyperlinkHref(existing)
+    setShowHyperlinkDialog(true)
+  }
+
+  const applyHyperlink = () => {
+    if (!editor) return
+    const href = hyperlinkHref.trim()
+    if (!href) { setShowHyperlinkDialog(false); return }
+    const target = hyperlinkNewTab ? '_blank' : '_self'
+    const { from, to, empty } = editor.state.selection
+    if (empty && hyperlinkText.trim()) {
+      editor.chain().focus()
+        .insertContent(`<a href="${href}" target="${target}" rel="${hyperlinkNewTab ? 'noopener noreferrer' : ''}">${hyperlinkText}</a>`)
+        .run()
+    } else if (!empty) {
+      editor.chain().focus().extendMarkRange('link').setLink({ href, target } as any).run()
+      if (hyperlinkText.trim() && hyperlinkText !== editor.state.doc.textBetween(from, to, ' ')) {
+        editor.chain().focus().insertContentAt({ from, to }, hyperlinkText).run()
+      }
+    }
+    setShowHyperlinkDialog(false)
+  }
+
+  const applyMarginsPreset = (preset: string) => {
+    if (preset === 'normal') setPageMargins({ top: '2.54cm', right: '2.54cm', bottom: '2.54cm', left: '2.54cm' })
+    else if (preset === 'narrow') setPageMargins({ top: '1.27cm', right: '1.27cm', bottom: '1.27cm', left: '1.27cm' })
+    else if (preset === 'moderate') setPageMargins({ top: '2.54cm', right: '1.91cm', bottom: '2.54cm', left: '1.91cm' })
+    else if (preset === 'wide') setPageMargins({ top: '2.54cm', right: '5.08cm', bottom: '2.54cm', left: '5.08cm' })
+    else if (preset === 'mirrored') setPageMargins({ top: '2.54cm', right: '2.54cm', bottom: '2.54cm', left: '3.18cm' })
+    setShowMarginsMenu(false)
+  }
+
+  const setParaIndentLeft = (px: number) => {
+    if (!editor) return
+    ;(editor.chain().focus() as any).setIndent(px).run()
+  }
+  const setParaIndentRight = (px: number) => {
+    if (!editor) return
+    ;(editor.chain().focus() as any).setIndentRight(px).run()
+  }
+  const setParaSpaceBefore = (px: number) => {
+    if (!editor) return
+    ;(editor.chain().focus() as any).setSpaceBefore(px).run()
+  }
+  const setParaSpaceAfter = (px: number) => {
+    if (!editor) return
+    ;(editor.chain().focus() as any).setSpaceAfter(px).run()
+  }
+
+  const insertPageBreakNow = () => {
+    if (!editor) return
+    ;(editor.chain().focus() as any).insertContent({ type: 'pageBreak' }).run()
+    setShowBreaksMenu(false)
+  }
+
+  const insertColumnBreakNow = () => {
+    if (!editor) return
+    editor.chain().focus().insertContent('<div class="column-break"></div><p></p>').run()
+    setShowBreaksMenu(false)
+  }
+
   if (!editor) {
     return null
   }
@@ -1185,6 +1602,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {[
             { id: 'home', label: '홈' },
             { id: 'insert', label: '삽입' },
+            { id: 'layout', label: '레이아웃' },
             ...(isInTable ? [
               { id: 'tableDesign', label: '표 디자인', contextual: true },
               { id: 'tableLayout', label: '표 레이아웃', contextual: true },
@@ -1319,14 +1737,62 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
               </div>
 
-              {/* 스타일 그룹 (Heading) */}
-              <div className="flex flex-col items-center px-2">
+              {/* 다단계 목록 그룹 */}
+              <div className="flex flex-col items-center px-2 border-r border-gray-300 relative">
+                <div className="flex gap-1 flex-1 items-start">
+                  <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : ''}`} title="글머리 기호">
+                    <span className="text-lg leading-none">•≡</span>
+                    <span className="text-[10px] mt-0.5">글머리</span>
+                  </button>
+                  <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editor.isActive('orderedList') ? 'bg-blue-200' : ''}`} title="번호 매기기">
+                    <span className="text-lg leading-none">1≡</span>
+                    <span className="text-[10px] mt-0.5">번호</span>
+                  </button>
+                  <button type="button" onClick={() => setShowMultilevelMenu(!showMultilevelMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="다단계 목록">
+                    <span className="text-lg leading-none">≡▾</span>
+                    <span className="text-[10px] mt-0.5">다단계</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">목록</div>
+                {showMultilevelMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[240px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2 px-1">다단계 목록 스타일</div>
+                    <button type="button" onClick={() => applyMultilevel('decimal')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">1. 2. 3. (숫자)</button>
+                    <button type="button" onClick={() => applyMultilevel('alpha')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">a. b. c. (영문 소문자)</button>
+                    <button type="button" onClick={() => applyMultilevel('roman')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">i. ii. iii. (로마자)</button>
+                    <button type="button" onClick={() => applyMultilevel('bullet')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">• 글머리 기호</button>
+                    <button type="button" onClick={() => applyMultilevel('ordered')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">번호 매기기 (기본)</button>
+                  </div>
+                )}
+              </div>
+
+              {/* 스타일 그룹 (Heading + Gallery) */}
+              <div className="flex flex-col items-center px-2 relative">
                 <div className="flex gap-1 flex-1 items-center">
                   <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 1 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 1</button>
                   <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 2</button>
                   <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 3</button>
+                  <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="px-1.5 py-1 text-sm rounded hover:bg-blue-100" title="스타일 갤러리">▾</button>
                 </div>
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">스타일</div>
+                {showStylesGallery && (
+                  <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[420px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">스타일 갤러리</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button type="button" onClick={() => applyStyle('normal')} className="px-2 py-2 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">본문</button>
+                      <button type="button" onClick={() => applyStyle('title')} className="px-2 py-2 text-xl font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">큰 제목</button>
+                      <button type="button" onClick={() => applyStyle('subtitle')} className="px-2 py-2 text-base italic text-gray-500 border border-gray-200 rounded hover:bg-blue-50 text-left">부제목</button>
+                      <button type="button" onClick={() => applyStyle('h1')} className="px-2 py-2 text-lg font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 1</button>
+                      <button type="button" onClick={() => applyStyle('h2')} className="px-2 py-2 text-base font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 2</button>
+                      <button type="button" onClick={() => applyStyle('h3')} className="px-2 py-2 text-sm font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 3</button>
+                      <button type="button" onClick={() => applyStyle('h4')} className="px-2 py-2 text-xs font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 4</button>
+                      <button type="button" onClick={() => applyStyle('strong')} className="px-2 py-2 text-xs font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">강조</button>
+                      <button type="button" onClick={() => applyStyle('emphasis')} className="px-2 py-2 text-xs italic border border-gray-200 rounded hover:bg-blue-50 text-left">기울임</button>
+                      <button type="button" onClick={() => applyStyle('quote')} className="px-2 py-2 text-xs italic text-gray-600 border border-gray-200 rounded hover:bg-blue-50 text-left">인용</button>
+                      <button type="button" onClick={() => applyStyle('code')} className="px-2 py-2 text-xs font-mono bg-gray-50 border border-gray-200 rounded hover:bg-blue-50 text-left">코드</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1418,9 +1884,13 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               {/* 링크 */}
               <div className="flex flex-col items-center px-3 border-r border-gray-300">
                 <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={() => setShowLinkInput(!showLinkInput)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="링크">
+                  <button type="button" onClick={openHyperlinkDialog} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="하이퍼링크 (Ctrl+K)">
                     <span className="text-2xl">🔗</span>
                     <span className="text-[10px] text-gray-700">링크</span>
+                  </button>
+                  <button type="button" onClick={() => setShowBookmarkDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="책갈피">
+                    <span className="text-2xl">🔖</span>
+                    <span className="text-[10px] text-gray-700">책갈피</span>
                   </button>
                   <button type="button" onClick={() => setShowLinkPreviewInput(!showLinkPreviewInput)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="링크 카드">
                     <span className="text-2xl">📎</span>
@@ -1428,6 +1898,230 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   </button>
                 </div>
                 <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">링크</div>
+              </div>
+
+              {/* 머리글/바닥글 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={() => setEditingHeaderFooter(editingHeaderFooter === 'header' ? null : 'header')} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editingHeaderFooter === 'header' ? 'bg-blue-200' : ''}`} title="머리글">
+                    <span className="text-2xl">▭</span>
+                    <span className="text-[10px] text-gray-700">머리글</span>
+                  </button>
+                  <button type="button" onClick={() => setEditingHeaderFooter(editingHeaderFooter === 'footer' ? null : 'footer')} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editingHeaderFooter === 'footer' ? 'bg-blue-200' : ''}`} title="바닥글">
+                    <span className="text-2xl">▬</span>
+                    <span className="text-[10px] text-gray-700">바닥글</span>
+                  </button>
+                  <button type="button" onClick={() => setShowPageNumberMenu(!showPageNumberMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="페이지 번호">
+                    <span className="text-2xl">#</span>
+                    <span className="text-[10px] text-gray-700">페이지</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">머리글/바닥글</div>
+                {showPageNumberMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[200px]">
+                    <button type="button" onClick={() => setPageNumber('top')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▲ 페이지 위쪽</button>
+                    <button type="button" onClick={() => setPageNumber('bottom')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▼ 페이지 아래쪽</button>
+                    <button type="button" onClick={() => setPageNumber('inline')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">◎ 현재 위치</button>
+                  </div>
+                )}
+              </div>
+
+              {/* 도형 / SmartArt / WordArt */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={() => setShowShapesMenu(!showShapesMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="도형">
+                    <span className="text-2xl">◆</span>
+                    <span className="text-[10px] text-gray-700">도형</span>
+                  </button>
+                  <button type="button" onClick={() => setShowSmartArtMenu(!showSmartArtMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="SmartArt">
+                    <span className="text-2xl">⚙</span>
+                    <span className="text-[10px] text-gray-700">SmartArt</span>
+                  </button>
+                  <button type="button" onClick={() => setShowWordArtMenu(!showWordArtMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="WordArt">
+                    <span className="text-2xl font-bold" style={{ background: 'linear-gradient(45deg,#2563eb,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>A</span>
+                    <span className="text-[10px] text-gray-700">WordArt</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">일러스트</div>
+                {showShapesMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[320px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">도형</div>
+                    <div className="grid grid-cols-6 gap-1">
+                      {[
+                        { k: 'rect', s: '▭' }, { k: 'circle', s: '◯' }, { k: 'triangle', s: '△' },
+                        { k: 'diamond', s: '◇' }, { k: 'pentagon', s: '⬠' }, { k: 'hexagon', s: '⬡' },
+                        { k: 'arrow', s: '→' }, { k: 'line', s: '─' }, { k: 'star', s: '☆' },
+                        { k: 'callout', s: '💬' }, { k: 'heart', s: '♡' }, { k: 'cloud', s: '☁' },
+                      ].map(it => (
+                        <button key={it.k} type="button" onClick={() => insertShape(it.k)} className="p-2 text-xl hover:bg-blue-100 rounded border border-gray-200">{it.s}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {showSmartArtMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[280px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">SmartArt 레이아웃</div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button type="button" onClick={() => insertSmartArt('list')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">📋 목록형</button>
+                      <button type="button" onClick={() => insertSmartArt('process')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">➡ 프로세스형</button>
+                      <button type="button" onClick={() => insertSmartArt('cycle')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">🔄 주기형</button>
+                      <button type="button" onClick={() => insertSmartArt('hierarchy')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">🏢 계층 구조형</button>
+                      <button type="button" onClick={() => insertSmartArt('relation')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">⚛ 관계형</button>
+                      <button type="button" onClick={() => insertSmartArt('pyramid')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">△ 피라미드형</button>
+                    </div>
+                  </div>
+                )}
+                {showWordArtMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[300px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">WordArt 스타일</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {['gradient', 'outline', 'shadow', 'neon', 'emboss', 'rainbow'].map(s => (
+                        <button key={s} type="button" onClick={() => insertWordArt(s)} className={`px-2 py-3 text-base font-bold wordart-sample wordart-${s} border border-gray-200 rounded hover:bg-blue-50`}>가나</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 기호 / 수식 / 페이지 나누기 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={() => setShowSymbolPicker(!showSymbolPicker)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="기호">
+                    <span className="text-2xl">Ω</span>
+                    <span className="text-[10px] text-gray-700">기호</span>
+                  </button>
+                  <button type="button" onClick={() => setShowEquationDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="수식">
+                    <span className="text-2xl">∑</span>
+                    <span className="text-[10px] text-gray-700">수식</span>
+                  </button>
+                  <button type="button" onClick={insertPageBreakNow} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="페이지 나누기 (Ctrl+Enter)">
+                    <span className="text-2xl">⇅</span>
+                    <span className="text-[10px] text-gray-700">페이지 나눔</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">기호</div>
+                {showSymbolPicker && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[380px] max-h-[260px] overflow-auto">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">기호 삽입</div>
+                    <div className="grid grid-cols-10 gap-1">
+                      {['©','®','™','§','¶','†','‡','•','·','…','«','»','€','£','¥','¢','°','±','×','÷','≠','≤','≥','≈','∞','∑','∏','√','∫','∂','∇','∈','∉','∋','⊂','⊃','∪','∩','∅','Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω','α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω','←','↑','→','↓','↔','↕','⇐','⇑','⇒','⇓','⇔','★','☆','♠','♣','♥','♦','♪','♫','☎','✓','✗','✉','❤','✦'].map((s, i) => (
+                        <button key={i} type="button" onClick={() => insertSymbol(s)} className="p-1 text-base hover:bg-blue-100 rounded border border-gray-100">{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========== 레이아웃 탭 ========== */}
+          {activeTab === 'layout' && (
+            <div className="flex items-stretch gap-0 min-h-[92px]">
+              {/* 페이지 설정 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300 relative">
+                <div className="flex items-start gap-2 flex-1">
+                  <button type="button" onClick={() => setShowMarginsMenu(!showMarginsMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="여백">
+                    <span className="text-2xl">▤</span>
+                    <span className="text-[10px] text-gray-700">여백</span>
+                  </button>
+                  <button type="button" onClick={() => setShowOrientationMenu(!showOrientationMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="용지 방향">
+                    <span className="text-2xl">{pageOrientation === 'portrait' ? '▯' : '▭'}</span>
+                    <span className="text-[10px] text-gray-700">방향</span>
+                  </button>
+                  <button type="button" onClick={() => setShowSizeMenu(!showSizeMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="용지 크기">
+                    <span className="text-2xl">📄</span>
+                    <span className="text-[10px] text-gray-700">크기</span>
+                  </button>
+                  <button type="button" onClick={() => setShowColumnsMenu(!showColumnsMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="단 나누기">
+                    <span className="text-2xl">▥</span>
+                    <span className="text-[10px] text-gray-700">단</span>
+                  </button>
+                  <button type="button" onClick={() => setShowBreaksMenu(!showBreaksMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="나누기">
+                    <span className="text-2xl">⇥</span>
+                    <span className="text-[10px] text-gray-700">나누기</span>
+                  </button>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">페이지 설정</div>
+
+                {showMarginsMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[260px]">
+                    <div className="text-xs font-semibold text-gray-700 mb-2 px-1">여백</div>
+                    <button type="button" onClick={() => applyMarginsPreset('normal')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">보통 (위/아래/좌/우 2.54cm)</button>
+                    <button type="button" onClick={() => applyMarginsPreset('narrow')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">좁게 (1.27cm)</button>
+                    <button type="button" onClick={() => applyMarginsPreset('moderate')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">중간 (2.54 / 1.91cm)</button>
+                    <button type="button" onClick={() => applyMarginsPreset('wide')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">넓게 (2.54 / 5.08cm)</button>
+                    <button type="button" onClick={() => applyMarginsPreset('mirrored')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">대칭 (안쪽 3.18cm)</button>
+                    <div className="border-t border-gray-200 mt-1 pt-1">
+                      <button type="button" onClick={() => { setShowMarginsMenu(false); setShowCustomMargins(true) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">사용자 지정 여백...</button>
+                    </div>
+                  </div>
+                )}
+
+                {showOrientationMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
+                    <button type="button" onClick={() => { setPageOrientation('portrait'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageOrientation === 'portrait' ? 'bg-blue-100' : ''}`}>▯ 세로</button>
+                    <button type="button" onClick={() => { setPageOrientation('landscape'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageOrientation === 'landscape' ? 'bg-blue-100' : ''}`}>▭ 가로</button>
+                  </div>
+                )}
+
+                {showSizeMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
+                    {(['A4','A3','A5','Letter','Legal'] as const).map(sz => (
+                      <button key={sz} type="button" onClick={() => { setPageSize(sz); setShowSizeMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageSize === sz ? 'bg-blue-100' : ''}`}>
+                        {sz} ({pageSizeDims[sz][0]} × {pageSizeDims[sz][1]} cm)
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showColumnsMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
+                    <button type="button" onClick={() => { setPageColumns(1); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 1 ? 'bg-blue-100' : ''}`}>▯ 하나</button>
+                    <button type="button" onClick={() => { setPageColumns(2); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 2 ? 'bg-blue-100' : ''}`}>▯▯ 둘</button>
+                    <button type="button" onClick={() => { setPageColumns(3); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 3 ? 'bg-blue-100' : ''}`}>▯▯▯ 셋</button>
+                  </div>
+                )}
+
+                {showBreaksMenu && (
+                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
+                    <button type="button" onClick={insertPageBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">⇅ 페이지 나누기</button>
+                    <button type="button" onClick={insertColumnBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▥ 단 나누기</button>
+                    <button type="button" onClick={() => { editor.chain().focus().setHorizontalRule().run(); setShowBreaksMenu(false) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">― 구분선</button>
+                  </div>
+                )}
+              </div>
+
+              {/* 단락 - 들여쓰기/간격 */}
+              <div className="flex flex-col items-center px-3 border-r border-gray-300">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 text-[11px] text-gray-700">
+                  <label className="flex items-center gap-1">왼쪽:
+                    <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentLeft(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
+                    <span className="text-[9px]">px</span>
+                  </label>
+                  <label className="flex items-center gap-1">오른쪽:
+                    <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentRight(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
+                    <span className="text-[9px]">px</span>
+                  </label>
+                  <label className="flex items-center gap-1">단락 앞:
+                    <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceBefore(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
+                    <span className="text-[9px]">px</span>
+                  </label>
+                  <label className="flex items-center gap-1">단락 뒤:
+                    <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceAfter(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
+                    <span className="text-[9px]">px</span>
+                  </label>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">단락</div>
+              </div>
+
+              {/* 현재 설정 표시 */}
+              <div className="flex flex-col items-center px-3">
+                <div className="flex flex-col gap-1 flex-1 text-[11px] text-gray-600">
+                  <div>용지: <b>{pageSize}</b> {pageOrientation === 'portrait' ? '세로' : '가로'}</div>
+                  <div>여백: {pageMargins.top} / {pageMargins.right} / {pageMargins.bottom} / {pageMargins.left}</div>
+                  <div>단: {pageColumns}개</div>
+                </div>
+                <div className="text-[9px] text-gray-500 pt-1 border-t border-gray-200 w-full text-center mt-1">현재 상태</div>
               </div>
             </div>
           )}
@@ -1764,16 +2458,113 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         </div>
       )}
 
+      {/* === 하이퍼링크 다이얼로그 === */}
+      {showHyperlinkDialog && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowHyperlinkDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-5 w-[460px] max-w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold text-gray-800 mb-3">하이퍼링크 삽입</div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">표시할 텍스트</label>
+                <input type="text" value={hyperlinkText} onChange={(e) => setHyperlinkText(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" placeholder="예: 자세히 보기" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">주소 (URL)</label>
+                <input type="url" value={hyperlinkHref} onChange={(e) => setHyperlinkHref(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" placeholder="https://..." autoFocus />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input type="checkbox" checked={hyperlinkNewTab} onChange={(e) => setHyperlinkNewTab(e.target.checked)} />
+                새 탭에서 열기
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setShowHyperlinkDialog(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">취소</button>
+              <button type="button" onClick={applyHyperlink} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === 책갈피 다이얼로그 === */}
+      {showBookmarkDialog && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowBookmarkDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-5 w-[420px] max-w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold text-gray-800 mb-3">책갈피 삽입</div>
+            <input type="text" value={bookmarkInput} onChange={(e) => setBookmarkInput(e.target.value.replace(/\s+/g, '-'))} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" placeholder="책갈피 이름 (공백 없이)" autoFocus />
+            <div className="text-xs text-gray-500 mt-2">이 위치로 이동할 수 있는 앵커가 만들어집니다. 하이퍼링크 주소에 #책갈피이름 을 쓰면 연결됩니다.</div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setShowBookmarkDialog(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">취소</button>
+              <button type="button" onClick={insertBookmarkNow} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">삽입</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === 사용자 지정 여백 다이얼로그 === */}
+      {showCustomMargins && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowCustomMargins(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-5 w-[480px] max-w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold text-gray-800 mb-3">사용자 지정 여백</div>
+            <div className="grid grid-cols-2 gap-3">
+              {(['top','right','bottom','left'] as const).map(side => (
+                <label key={side} className="text-xs text-gray-600 block">
+                  {side === 'top' ? '위' : side === 'right' ? '오른쪽' : side === 'bottom' ? '아래' : '왼쪽'}
+                  <input
+                    type="text"
+                    value={pageMargins[side]}
+                    onChange={(e) => setPageMargins({ ...pageMargins, [side]: e.target.value })}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mt-1"
+                    placeholder="예: 2.54cm"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setShowCustomMargins(false)} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === 수식(LaTeX) 다이얼로그 === */}
+      {showEquationDialog && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowEquationDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-5 w-[560px] max-w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold text-gray-800 mb-3">수식 삽입 (LaTeX)</div>
+            <textarea value={equationLatex} onChange={(e) => setEquationLatex(e.target.value)} className="w-full h-28 px-2 py-1.5 border border-gray-300 rounded text-sm font-mono" placeholder="예: E = mc^2  또는  \frac{a}{b}" autoFocus />
+            <div className="text-xs text-gray-500 mt-2">미리보기:</div>
+            {equationLatex && (
+              <div className="mt-1 p-2 border border-gray-200 rounded bg-gray-50 flex items-center justify-center min-h-[60px]">
+                <img alt="equation preview" src={`https://latex.codecogs.com/svg.image?${encodeURIComponent(equationLatex)}`} />
+              </div>
+            )}
+            <div className="flex justify-between gap-2 mt-4">
+              <div className="flex gap-1 flex-wrap">
+                {['\\frac{a}{b}','\\sqrt{x}','\\sum_{i=1}^{n}','\\int_a^b','x^2','\\alpha','\\beta','\\pi'].map(ex => (
+                  <button key={ex} type="button" onClick={() => setEquationLatex(equationLatex + ex)} className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-blue-100 rounded border border-gray-200">{ex}</button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowEquationDialog(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">취소</button>
+                <button type="button" onClick={() => { if (!equationLatex.trim()) return; const src = `https://latex.codecogs.com/svg.image?${encodeURIComponent(equationLatex)}`; editor?.chain().focus().setImage({ src }).run(); setEquationLatex(''); setShowEquationDialog(false) }} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">삽입</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 에디터 (A4 narrow margin 1.27cm 레이아웃) */}
       <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-200 p-4' : 'bg-gray-200 p-4'}>
         <div
           className="mx-auto bg-white shadow-md relative"
           style={{
-            width: '21cm',
+            width: getPageDims().width + 'cm',
             maxWidth: '100%',
-            minHeight: '29.7cm',
-            padding: '1.27cm',
+            minHeight: getPageDims().height + 'cm',
+            padding: pageMargins.top + ' ' + pageMargins.right + ' ' + pageMargins.bottom + ' ' + pageMargins.left,
             boxSizing: 'border-box',
+            columnCount: pageColumns,
+            columnGap: '1cm',
           }}
         >
           <EditorContent editor={editor} />
@@ -2052,7 +2843,52 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .preview-table.tbl-minimal .pt-head .pt-cell { border-bottom: 2px solid #111827; }
         .preview-table.tbl-dark .pt-cell { background: #1f2937; border-color: #374151; }
         .preview-table.tbl-dark .pt-head .pt-cell { background: #111827; }
-      `}</style>
+
+        /* === SmartArt === */
+        .smartart { display: flex; gap: 8px; align-items: center; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 8px 0; flex-wrap: wrap; }
+        .smartart .sa-box { padding: 8px 14px; background: linear-gradient(180deg, #3b82f6, #1d4ed8); color: #fff; border-radius: 4px; font-weight: 600; font-size: 13px; min-width: 80px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .smartart .sa-arrow { color: #64748b; font-size: 18px; font-weight: bold; }
+        .smartart-hier { flex-direction: column; gap: 12px; align-items: center; }
+        .smartart-hier .sa-top { padding: 10px 18px; background: linear-gradient(180deg, #0ea5e9, #0369a1); color: #fff; border-radius: 4px; font-weight: 700; }
+        .smartart-hier .sa-row { display: flex; gap: 12px; }
+        .smartart-cycle { justify-content: center; }
+        .smartart-cycle .sa-cbox { padding: 10px 14px; background: linear-gradient(180deg, #10b981, #047857); color: #fff; border-radius: 999px; font-weight: 600; font-size: 12px; }
+        .smartart-cycle .sa-carrow { color: #047857; font-size: 20px; }
+        .smartart-list { flex-direction: column; align-items: stretch; gap: 6px; }
+        .smartart-list .sa-litem { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border-left: 4px solid #6366f1; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+        .smartart-list .sa-idx { width: 28px; height: 28px; border-radius: 50%; background: #6366f1; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .smartart-rel { justify-content: center; }
+        .smartart-rel .sa-rbox { width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; margin: 0 -6px; opacity: .92; }
+        .smartart-pyr { flex-direction: column; align-items: center; gap: 3px; }
+        .smartart-pyr .sa-pyr { color: #fff; padding: 8px 14px; font-weight: 600; font-size: 12px; }
+        .smartart-pyr .sa-pyr1 { background: linear-gradient(180deg,#7c3aed,#5b21b6); width: 40%; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+        .smartart-pyr .sa-pyr2 { background: linear-gradient(180deg,#a78bfa,#7c3aed); width: 60%; clip-path: polygon(15% 0, 85% 0, 100% 100%, 0 100%); }
+        .smartart-pyr .sa-pyr3 { background: linear-gradient(180deg,#c4b5fd,#a78bfa); width: 80%; clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%); }
+
+        /* === WordArt === */
+        .wordart { display: inline-block; font-weight: 900; padding: 0 2px; }
+        .wordart-gradient { background: linear-gradient(90deg, #2563eb, #ec4899, #f59e0b); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; font-size: 1.8em; }
+        .wordart-outline { color: transparent; -webkit-text-stroke: 1.5px #1f2937; font-size: 1.8em; }
+        .wordart-shadow { color: #1f2937; text-shadow: 3px 3px 0 #9ca3af, 6px 6px 0 #d1d5db; font-size: 1.8em; }
+        .wordart-neon { color: #fff; text-shadow: 0 0 4px #22d3ee, 0 0 8px #06b6d4, 0 0 12px #0891b2; background: #0f172a; padding: 2px 8px; border-radius: 4px; font-size: 1.8em; }
+        .wordart-emboss { color: #e5e7eb; text-shadow: 1px 1px 0 #fff, -1px -1px 0 #6b7280; font-size: 1.8em; }
+        .wordart-rainbow { background: linear-gradient(90deg, #ef4444, #f59e0b, #eab308, #10b981, #3b82f6, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; font-size: 1.8em; font-style: italic; }
+        .wordart-sample { font-size: 1em !important; }
+
+        /* === Page Number / Bookmark === */
+        .page-number { display: inline-block; padding: 0 4px; color: #2563eb; font-variant-numeric: tabular-nums; }
+        .bookmark { display: inline-block; color: #f59e0b; text-decoration: none; margin: 0 2px; }
+        .bookmark::before { content: '🔖'; font-size: 0.85em; }
+
+        /* === Column break / Text Box === */
+        .column-break { break-after: column; page-break-after: always; height: 0; display: block; }
+        .text-box { display: inline-block; padding: 8px 12px; border: 2px dashed #3b82f6; border-radius: 4px; background: #eff6ff; margin: 4px; min-width: 120px; min-height: 40px; }
+
+        /* === List styles === */
+        .ProseMirror ol[data-list-style="decimal"] { list-style-type: decimal; }
+        .ProseMirror ol[data-list-style="lower-alpha"] { list-style-type: lower-alpha; }
+        .ProseMirror ol[data-list-style="lower-roman"] { list-style-type: lower-roman; }
+            `}</style>
     </div>
   )
 }
