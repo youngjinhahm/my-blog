@@ -648,6 +648,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showSizeMenu, setShowSizeMenu] = useState(false)
   const [showColumnsMenu, setShowColumnsMenu] = useState(false)
   const [showBreaksMenu, setShowBreaksMenu] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(100)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [charCount, setCharCount] = useState(0)
 
   const [showInsertGrid, setShowInsertGrid] = useState(false)
   const [hoverRow, setHoverRow] = useState(0)
@@ -725,6 +729,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       const text = editor.getText()
       const words = text.trim().split(/\s+/).filter(word => word.length > 0)
       setWordCount(words.length)
+      setCharCount(text.length)
     },
     editorProps: {
       attributes: {
@@ -893,6 +898,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       const text = editor.getText()
       const words = text.trim().split(/\s+/).filter(word => word.length > 0)
       setWordCount(words.length)
+      setCharCount(text.length)
     }
   }, [editor])
 
@@ -962,6 +968,48 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInTable])
+
+  // 페이지 수 계산 (A4 기준, 여백 제외)
+  useEffect(() => {
+    if (!editor) return
+    const calcPages = () => {
+      const editorEl = editor.view.dom as HTMLElement
+      if (!editorEl) return
+      const contentHeight = editorEl.scrollHeight
+      const [pw, ph] = pageSizeDims[pageSize]
+      const pageHeightCm = pageOrientation === 'landscape' ? pw : ph
+      // cm 을 px 로 변환 (96dpi 기준 1cm = 37.795px)
+      const parseCm = (v: string) => {
+        const n = parseFloat(v)
+        if (v.includes('cm')) return n * 37.795
+        if (v.includes('mm')) return n * 3.7795
+        if (v.includes('in')) return n * 96
+        return n
+      }
+      const marginTop = parseCm(pageMargins.top)
+      const marginBottom = parseCm(pageMargins.bottom)
+      const contentAreaHeightPx = (pageHeightCm * 37.795) - marginTop - marginBottom
+      const pages = Math.max(1, Math.ceil(contentHeight / contentAreaHeightPx))
+      setTotalPages(pages)
+      // 현재 커서 위치 기반 현재 페이지
+      try {
+        const { from } = editor.state.selection
+        const coords = editor.view.coordsAtPos(from)
+        const editorRect = editorEl.getBoundingClientRect()
+        const cursorOffsetTop = coords.top - editorRect.top
+        const curPage = Math.max(1, Math.min(pages, Math.ceil((cursorOffsetTop + 20) / contentAreaHeightPx)))
+        setCurrentPage(curPage)
+      } catch {
+        setCurrentPage(1)
+      }
+    }
+    calcPages()
+    const unsub = editor.on('update', calcPages)
+    const unsub2 = editor.on('selectionUpdate', calcPages)
+    return () => { try { (unsub as any)?.(); (unsub2 as any)?.() } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, pageSize, pageOrientation, pageMargins])
+
 
   // 현재 선택이 속한 표 노드와 위치를 찾음
   const findEnclosingTable = (): { node: any; pos: number } | null => {
@@ -1596,7 +1644,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   return (
     <div className={`border border-gray-300 rounded-lg ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
       {/* ===== Word 스타일 리본 ===== */}
-      <div className="sticky top-0 z-20 bg-gradient-to-b from-gray-50 to-gray-100 border-b border-gray-300 shadow-sm">
+      <div className="sticky top-0 z-20 word-ribbon border-b border-gray-300 shadow-sm">
         {/* 탭 바 */}
         <div className="flex items-center px-2 pt-1 border-b border-gray-200 bg-white">
           {[
@@ -1631,7 +1679,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           >
             {isFullscreen ? '⊟ 창모드' : '⊠ 전체화면'}
           </button>
-          <div className="px-2 py-1 text-[10px] text-gray-500">{wordCount} 단어</div>
+          {/* wordCount 는 하단 상태바로 이동 */}
         </div>
 
         {/* 리본 본문 - overflow visible 로 드롭다운이 아래 영역 위로 겹치게 */}
@@ -1654,15 +1702,83 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               <div className="flex flex-col items-center px-2 border-r border-gray-300">
                 <div className="flex flex-col gap-1 flex-1">
                   <div className="flex items-center gap-1">
-                    <select onChange={handleFontFamilyChange} className="px-1 py-0.5 text-xs border border-gray-300 rounded bg-white w-32" defaultValue="">
+                    <select onChange={handleFontFamilyChange} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white w-40 font-select" defaultValue="">
                       <option value="">본문 폰트</option>
-                      <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
-                      <option value="'맑은 고딕'">맑은 고딕</option>
-                      <option value="Arial">Arial</option>
-                      <option value="'Times New Roman'">Times New Roman</option>
-                      <option value="'Courier New'">Courier New</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Verdana">Verdana</option>
+                      <optgroup label="최근 사용">
+                        <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
+                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
+                        <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
+                      </optgroup>
+                      <optgroup label="한글 글꼴">
+                        <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
+                        <option value="'Noto Serif KR', serif" style={{ fontFamily: "'Noto Serif KR'" }}>Noto Serif KR</option>
+                        <option value="'Nanum Gothic', sans-serif" style={{ fontFamily: "'Nanum Gothic'" }}>나눔고딕</option>
+                        <option value="'Nanum Myeongjo', serif" style={{ fontFamily: "'Nanum Myeongjo'" }}>나눔명조</option>
+                        <option value="'Nanum Pen Script', cursive" style={{ fontFamily: "'Nanum Pen Script'" }}>나눔손글씨 펜</option>
+                        <option value="'Nanum Brush Script', cursive" style={{ fontFamily: "'Nanum Brush Script'" }}>나눔손글씨 붓</option>
+                        <option value="'Gowun Dodum', sans-serif" style={{ fontFamily: "'Gowun Dodum'" }}>고운돋움</option>
+                        <option value="'Gowun Batang', serif" style={{ fontFamily: "'Gowun Batang'" }}>고운바탕</option>
+                        <option value="'Gaegu', cursive" style={{ fontFamily: "'Gaegu'" }}>개구쟁이</option>
+                        <option value="'Jua', sans-serif" style={{ fontFamily: "'Jua'" }}>주아체</option>
+                        <option value="'Do Hyeon', sans-serif" style={{ fontFamily: "'Do Hyeon'" }}>도현체</option>
+                        <option value="'Black Han Sans', sans-serif" style={{ fontFamily: "'Black Han Sans'" }}>블랙한산스</option>
+                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
+                        <option value="'바탕', Batang, serif" style={{ fontFamily: "Batang, '바탕'" }}>바탕</option>
+                        <option value="'굴림', Gulim, sans-serif" style={{ fontFamily: "Gulim, '굴림'" }}>굴림</option>
+                        <option value="'돋움', Dotum, sans-serif" style={{ fontFamily: "Dotum, '돋움'" }}>돋움</option>
+                        <option value="'궁서', Gungsuh, serif" style={{ fontFamily: "Gungsuh, '궁서'" }}>궁서</option>
+                      </optgroup>
+                      <optgroup label="영문 Serif">
+                        <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
+                        <option value="Georgia, serif" style={{ fontFamily: "Georgia" }}>Georgia</option>
+                        <option value="'Cambria', Georgia, serif" style={{ fontFamily: "Cambria, Georgia" }}>Cambria</option>
+                        <option value="Garamond, 'Times New Roman', serif" style={{ fontFamily: "Garamond" }}>Garamond</option>
+                        <option value="'Book Antiqua', 'Palatino Linotype', serif" style={{ fontFamily: "'Palatino Linotype'" }}>Palatino Linotype</option>
+                        <option value="'Baskerville', 'Baskerville Old Face', serif" style={{ fontFamily: "Baskerville" }}>Baskerville</option>
+                        <option value="'Courier New', Courier, monospace" style={{ fontFamily: "'Courier New'" }}>Courier New</option>
+                        <option value="'Lucida Bright', Georgia, serif" style={{ fontFamily: "'Lucida Bright'" }}>Lucida Bright</option>
+                        <option value="'Playfair Display', serif" style={{ fontFamily: "'Playfair Display'" }}>Playfair Display</option>
+                        <option value="'Merriweather', serif" style={{ fontFamily: "'Merriweather'" }}>Merriweather</option>
+                        <option value="'Lora', serif" style={{ fontFamily: "'Lora'" }}>Lora</option>
+                        <option value="'PT Serif', serif" style={{ fontFamily: "'PT Serif'" }}>PT Serif</option>
+                      </optgroup>
+                      <optgroup label="영문 Sans-serif">
+                        <option value="Arial, Helvetica, sans-serif" style={{ fontFamily: "Arial" }}>Arial</option>
+                        <option value="'Arial Black', Arial, sans-serif" style={{ fontFamily: "'Arial Black'" }}>Arial Black</option>
+                        <option value="'Arial Narrow', Arial, sans-serif" style={{ fontFamily: "'Arial Narrow'" }}>Arial Narrow</option>
+                        <option value="Helvetica, Arial, sans-serif" style={{ fontFamily: "Helvetica" }}>Helvetica</option>
+                        <option value="Calibri, 'Segoe UI', sans-serif" style={{ fontFamily: "Calibri" }}>Calibri</option>
+                        <option value="'Segoe UI', Tahoma, sans-serif" style={{ fontFamily: "'Segoe UI'" }}>Segoe UI</option>
+                        <option value="Tahoma, Verdana, sans-serif" style={{ fontFamily: "Tahoma" }}>Tahoma</option>
+                        <option value="Verdana, Geneva, sans-serif" style={{ fontFamily: "Verdana" }}>Verdana</option>
+                        <option value="'Trebuchet MS', sans-serif" style={{ fontFamily: "'Trebuchet MS'" }}>Trebuchet MS</option>
+                        <option value="'Century Gothic', sans-serif" style={{ fontFamily: "'Century Gothic'" }}>Century Gothic</option>
+                        <option value="'Franklin Gothic Medium', sans-serif" style={{ fontFamily: "'Franklin Gothic Medium'" }}>Franklin Gothic</option>
+                        <option value="'Gill Sans', 'Gill Sans MT', sans-serif" style={{ fontFamily: "'Gill Sans'" }}>Gill Sans</option>
+                        <option value="'Roboto', sans-serif" style={{ fontFamily: "'Roboto'" }}>Roboto</option>
+                        <option value="'Open Sans', sans-serif" style={{ fontFamily: "'Open Sans'" }}>Open Sans</option>
+                        <option value="'Lato', sans-serif" style={{ fontFamily: "'Lato'" }}>Lato</option>
+                        <option value="'Montserrat', sans-serif" style={{ fontFamily: "'Montserrat'" }}>Montserrat</option>
+                        <option value="'Inter', sans-serif" style={{ fontFamily: "'Inter'" }}>Inter</option>
+                        <option value="'Poppins', sans-serif" style={{ fontFamily: "'Poppins'" }}>Poppins</option>
+                      </optgroup>
+                      <optgroup label="모노스페이스">
+                        <option value="'Courier New', Courier, monospace" style={{ fontFamily: "'Courier New'" }}>Courier New</option>
+                        <option value="Consolas, 'Courier New', monospace" style={{ fontFamily: "Consolas" }}>Consolas</option>
+                        <option value="'Lucida Console', Monaco, monospace" style={{ fontFamily: "'Lucida Console'" }}>Lucida Console</option>
+                        <option value="Monaco, Menlo, monospace" style={{ fontFamily: "Monaco" }}>Monaco</option>
+                        <option value="Menlo, Consolas, monospace" style={{ fontFamily: "Menlo" }}>Menlo</option>
+                        <option value="'JetBrains Mono', monospace" style={{ fontFamily: "'JetBrains Mono'" }}>JetBrains Mono</option>
+                        <option value="'Fira Code', monospace" style={{ fontFamily: "'Fira Code'" }}>Fira Code</option>
+                        <option value="'Source Code Pro', monospace" style={{ fontFamily: "'Source Code Pro'" }}>Source Code Pro</option>
+                      </optgroup>
+                      <optgroup label="장식/표시">
+                        <option value="Impact, 'Arial Black', sans-serif" style={{ fontFamily: "Impact" }}>Impact</option>
+                        <option value="'Comic Sans MS', 'Marker Felt', cursive" style={{ fontFamily: "'Comic Sans MS'" }}>Comic Sans MS</option>
+                        <option value="'Brush Script MT', cursive" style={{ fontFamily: "'Brush Script MT'" }}>Brush Script</option>
+                        <option value="'Copperplate', 'Copperplate Gothic Light', fantasy" style={{ fontFamily: "Copperplate" }}>Copperplate</option>
+                        <option value="'Papyrus', fantasy" style={{ fontFamily: "Papyrus" }}>Papyrus</option>
+                      </optgroup>
                     </select>
                     <select onChange={handleFontSizeChange} className="px-1 py-0.5 text-xs border border-gray-300 rounded bg-white w-14" defaultValue="">
                       <option value="" disabled>크기</option>
@@ -2553,18 +2669,29 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         </div>
       )}
 
-      {/* 에디터 (A4 narrow margin 1.27cm 레이아웃) */}
-      <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-200 p-4' : 'bg-gray-200 p-4'}>
+      {/* 에디터 (A4 페이지 레이아웃 + 줌 + 페이지 구분) */}
+      <div className={isFullscreen ? 'h-[calc(100vh-240px)] overflow-auto editor-canvas' : 'editor-canvas'}>
         <div
-          className="mx-auto bg-white shadow-md relative"
+          className="editor-zoom-wrapper"
+          style={{
+            transform: `scale(${zoomLevel / 100})`,
+            transformOrigin: 'top center',
+            width: `${100 * 100 / zoomLevel}%`,
+          }}
+        >
+        <div
+          className="mx-auto bg-white shadow-lg relative editor-page"
           style={{
             width: getPageDims().width + 'cm',
-            maxWidth: '100%',
+            maxWidth: 'none',
             minHeight: getPageDims().height + 'cm',
             padding: pageMargins.top + ' ' + pageMargins.right + ' ' + pageMargins.bottom + ' ' + pageMargins.left,
             boxSizing: 'border-box',
             columnCount: pageColumns,
             columnGap: '1cm',
+            backgroundImage: totalPages > 1 ? `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${getPageDims().height}cm - ${pageMargins.top} - ${pageMargins.bottom} - 1px), #d1d5db calc(${getPageDims().height}cm - ${pageMargins.top} - ${pageMargins.bottom} - 1px), #d1d5db calc(${getPageDims().height}cm - ${pageMargins.top} - ${pageMargins.bottom}))` : undefined,
+            backgroundPosition: `0 0`,
+            backgroundSize: `100% calc(${getPageDims().height}cm - ${pageMargins.top} - ${pageMargins.bottom})`,
           }}
         >
           <EditorContent editor={editor} />
@@ -2590,11 +2717,44 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
             </div>
           )}
         </div>
+        </div>
       </div>
 
-      {/* 사용 안내 */}
-      <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
-        💡 팁: Ctrl+Z 되돌리기, Ctrl+B 굵게, Ctrl+I 기울임, Ctrl+U 밑줄 | 🔗 링크 = 텍스트 링크, 📎 링크 카드 = 썸네일
+      {/* === Word 스타일 하단 상태바 (Status Bar) === */}
+      <div className="flex items-center gap-3 px-4 py-1.5 text-[11px] text-gray-700 border-t border-gray-300 bg-gradient-to-b from-[#f3f4f6] to-[#e5e7eb]">
+        <div className="flex items-center gap-1">
+          <span className="font-semibold">📄 페이지</span>
+          <span className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-gray-800 font-medium tabular-nums">{currentPage} / {totalPages}</span>
+        </div>
+        <div className="w-px h-4 bg-gray-400"></div>
+        <div className="flex items-center gap-1">
+          <span>단어: <b className="tabular-nums">{wordCount.toLocaleString()}</b></span>
+        </div>
+        <div className="w-px h-4 bg-gray-400"></div>
+        <div className="flex items-center gap-1">
+          <span>글자: <b className="tabular-nums">{charCount.toLocaleString()}</b></span>
+        </div>
+        <div className="flex-1"></div>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">💡 Ctrl+Z/B/I/U, Ctrl+K 링크</span>
+        </div>
+        <div className="w-px h-4 bg-gray-400"></div>
+        {/* Zoom 컨트롤 */}
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setZoomLevel(Math.max(25, zoomLevel - 10))} className="w-6 h-5 flex items-center justify-center hover:bg-blue-200 rounded text-sm font-bold" title="축소">−</button>
+          <input
+            type="range"
+            min="25"
+            max="300"
+            step="5"
+            value={zoomLevel}
+            onChange={(e) => setZoomLevel(Number(e.target.value))}
+            className="w-32 h-1 accent-blue-600"
+            title="확대/축소"
+          />
+          <button type="button" onClick={() => setZoomLevel(Math.min(300, zoomLevel + 10))} className="w-6 h-5 flex items-center justify-center hover:bg-blue-200 rounded text-sm font-bold" title="확대">+</button>
+          <button type="button" onClick={() => setZoomLevel(100)} className="min-w-[48px] px-2 h-5 text-[11px] hover:bg-blue-200 rounded tabular-nums font-semibold text-gray-800" title="100%로 복원">{zoomLevel}%</button>
+        </div>
       </div>
 
       {/* 차트 삽입 다이얼로그 */}
@@ -2609,7 +2769,69 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       <style jsx global>{`
         .ProseMirror {
           outline: none;
+          font-family: 'Calibri', '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+          font-size: 11pt;
+          line-height: 1.5;
+          color: #1f2937;
         }
+
+        /* === Word 스타일 캔버스 === */
+        .editor-canvas {
+          background: #e5e7eb;
+          padding: 20px 4px;
+          overflow-x: auto;
+          overflow-y: auto;
+        }
+        .editor-zoom-wrapper {
+          transition: transform 0.15s ease-out;
+          margin: 0 auto;
+        }
+        .editor-page {
+          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+          position: relative;
+        }
+        .editor-page::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border: 1px dashed transparent;
+          border-radius: 0;
+        }
+
+        /* Font dropdown options: preview each font in its actual typeface */
+        .font-select option { padding: 4px 8px; }
+
+        /* Word 스타일 리본 */
+        .word-ribbon {
+          background: linear-gradient(to bottom, #fafbfc 0%, #f3f4f6 70%, #e8eaed 100%);
+          border-bottom: 1px solid #c1c3c7;
+        }
+        .word-ribbon button {
+          transition: background 0.08s ease, border-color 0.08s ease;
+        }
+        .word-ribbon select, .word-ribbon input[type="text"], .word-ribbon input[type="number"], .word-ribbon input[type="url"] {
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          transition: border-color 0.08s ease, box-shadow 0.08s ease;
+        }
+        .word-ribbon select:hover, .word-ribbon select:focus,
+        .word-ribbon input:hover, .word-ribbon input:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+          outline: none;
+        }
+        .word-ribbon button[class*="hover:bg-blue-100"]:hover {
+          background-color: #e0ecff !important;
+          box-shadow: inset 0 0 0 1px #bfdbfe;
+        }
+
+        /* Word-like scrollbar */
+        .editor-canvas::-webkit-scrollbar { width: 14px; height: 14px; }
+        .editor-canvas::-webkit-scrollbar-track { background: #e5e7eb; }
+        .editor-canvas::-webkit-scrollbar-thumb { background: #9ca3af; border: 3px solid #e5e7eb; border-radius: 7px; }
+        .editor-canvas::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
         .ProseMirror .image-resizer {
           margin: 0;
           line-height: 0;
