@@ -1994,327 +1994,332 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
           {/* ========== 삽입 탭 ========== */}
           {activeTab === 'insert' && (
-            <div className="flex items-stretch gap-0 min-h-[92px]">
-              {/* 표 삽입 (그리드 피커) */}
-              <div className="word-group flex flex-col items-center px-3 relative">
-                <div className="flex items-start flex-1 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => { setShowInsertGrid(!showInsertGrid); editor.commands.focus() }}
-                    className="flex flex-col items-center px-3 py-1 hover:bg-blue-100 rounded"
-                    title="표 삽입"
-                  >
-                    <span className="text-3xl leading-none">⊞</span>
-                    <span className="text-[10px] text-gray-700 mt-1">표 ▾</span>
-                  </button>
+            <div className="word-ribbon-tab">
+              {/* 페이지 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => { setEditingHeaderFooter(editingHeaderFooter === 'header' ? null : 'header'); editor.commands.focus() }} className={`word-btn-large ${editingHeaderFooter === 'header' ? 'word-btn-active' : ''}`} title="머리글">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="4" fill="#2b579a" opacity="0.85"/><rect x="4" y="10" width="16" height="1.5" fill="#605e5c"/><rect x="4" y="13" width="12" height="1.5" fill="#605e5c"/><rect x="4" y="16" width="16" height="1.5" fill="#605e5c"/><rect x="4" y="19" width="10" height="1.5" fill="#605e5c"/></svg>
+                      <span className="word-btn-label">머리글</span>
+                    </button>
+                  </div>
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => { setEditingHeaderFooter(editingHeaderFooter === 'footer' ? null : 'footer'); editor.commands.focus() }} className={`word-btn-large ${editingHeaderFooter === 'footer' ? 'word-btn-active' : ''}`} title="바닥글">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="1.5" fill="#605e5c"/><rect x="4" y="7" width="10" height="1.5" fill="#605e5c"/><rect x="4" y="10" width="16" height="1.5" fill="#605e5c"/><rect x="4" y="13" width="12" height="1.5" fill="#605e5c"/><rect x="4" y="16" width="16" height="4" fill="#2b579a" opacity="0.85"/></svg>
+                      <span className="word-btn-label">바닥글</span>
+                    </button>
+                  </div>
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => setShowPageNumberMenu(!showPageNumberMenu)} className="word-btn-large" title="페이지 번호">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="1" stroke="#605e5c" strokeWidth="1.5"/><text x="12" y="16" textAnchor="middle" fontSize="11" fontWeight="600" fill="#2b579a">#</text></svg>
+                      <span className="word-btn-label">페이지 번호 ▾</span>
+                    </button>
+                    {showPageNumberMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
+                        <button type="button" onClick={() => setPageNumber('top')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">페이지 위쪽</button>
+                        <button type="button" onClick={() => setPageNumber('bottom')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">페이지 아래쪽</button>
+                        <button type="button" onClick={() => setPageNumber('inline')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">현재 위치</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="word-group-label">머리글 및 바닥글</div>
+              </div>
+
+              {/* 표 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col" style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => { setShowInsertGrid(!showInsertGrid); editor.commands.focus() }} className="word-btn-large" title="표 삽입">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="1" stroke="#2b579a" strokeWidth="1.5" fill="#ffffff"/><line x1="3" y1="9" x2="21" y2="9" stroke="#2b579a" strokeWidth="1.2"/><line x1="3" y1="15" x2="21" y2="15" stroke="#2b579a" strokeWidth="1.2"/><line x1="9" y1="3" x2="9" y2="21" stroke="#2b579a" strokeWidth="1.2"/><line x1="15" y1="3" x2="15" y2="21" stroke="#2b579a" strokeWidth="1.2"/></svg>
+                      <span className="word-btn-label">표 ▾</span>
+                    </button>
+                    {showInsertGrid && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[280px]">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">
+                          {hoverRow > 0 && hoverCol > 0 ? `${hoverRow} × ${hoverCol} 표` : '표 삽입'}
+                        </div>
+                        <div className="inline-block" onMouseLeave={() => { setHoverRow(0); setHoverCol(0) }}>
+                          {Array.from({ length: 8 }).map((_, r) => (
+                            <div key={r} className="flex">
+                              {Array.from({ length: 10 }).map((_, c) => {
+                                const active = r < hoverRow && c < hoverCol
+                                return (
+                                  <div key={c} onMouseEnter={() => { setHoverRow(r + 1); setHoverCol(c + 1) }} onClick={() => insertTableFromGrid(r + 1, c + 1)} className={`w-5 h-5 m-[1px] border cursor-pointer ${active ? 'bg-blue-400 border-blue-600' : 'bg-white border-gray-300 hover:border-blue-400'}`} />
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="word-group-label">표</div>
-                {showInsertGrid && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[260px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">
-                      {hoverRow > 0 && hoverCol > 0 ? `${hoverRow} × ${hoverCol} 표` : '표 크기를 선택하세요'}
-                    </div>
-                    <div
-                      className="inline-block"
-                      onMouseLeave={() => { setHoverRow(0); setHoverCol(0) }}
-                    >
-                      {Array.from({ length: 8 }).map((_, r) => (
-                        <div key={r} className="flex">
-                          {Array.from({ length: 10 }).map((_, c) => {
-                            const active = r < hoverRow && c < hoverCol
-                            return (
-                              <div
-                                key={c}
-                                onMouseEnter={() => { setHoverRow(r + 1); setHoverCol(c + 1) }}
-                                onClick={() => insertTableFromGrid(r + 1, c + 1)}
-                                className={`w-5 h-5 m-[1px] border cursor-pointer ${
-                                  active ? 'bg-blue-400 border-blue-600' : 'bg-white border-gray-300 hover:border-blue-400'
-                                }`}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 pt-2 border-t border-gray-200 flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => insertTableFromGrid(3, 3)}
-                        className="flex-1 px-2 py-1 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        3×3 기본 삽입
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowInsertGrid(false); setHoverRow(0); setHoverCol(0) }}
-                        className="px-2 py-1 text-[10px] bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                      >
-                        취소
-                      </button>
-                    </div>
+              </div>
+
+              {/* 일러스트레이션 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={addImage} className="word-btn-large" title="그림">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="1" stroke="#2b579a" strokeWidth="1.5" fill="#ffffff"/><circle cx="8" cy="9" r="1.5" fill="#f2c24a"/><path d="M4 18l5-6 4 4 3-3 4 5" stroke="#70ad47" strokeWidth="1.5" fill="none" strokeLinejoin="round"/></svg>
+                      <span className="word-btn-label">그림</span>
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                   </div>
-                )}
-              </div>
-
-              {/* 그림/미디어 */}
-              <div className="word-group flex flex-col items-center px-3">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={addImage} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="이미지">
-                    <span className="text-2xl">🖼️</span>
-                    <span className="text-[10px] text-gray-700">그림</span>
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                  <button type="button" onClick={() => setShowChartDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="차트">
-                    <span className="text-2xl">📊</span>
-                    <span className="text-[10px] text-gray-700">차트</span>
-                  </button>
-                  <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="구분선">
-                    <span className="text-2xl">―</span>
-                    <span className="text-[10px] text-gray-700">구분선</span>
-                  </button>
-                </div>
-                <div className="word-group-label">일러스트</div>
-              </div>
-
-              {/* 링크 */}
-              <div className="word-group flex flex-col items-center px-3">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={openHyperlinkDialog} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="하이퍼링크 (Ctrl+K)">
-                    <span className="text-2xl">🔗</span>
-                    <span className="text-[10px] text-gray-700">링크</span>
-                  </button>
-                  <button type="button" onClick={() => setShowBookmarkDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="책갈피">
-                    <span className="text-2xl">🔖</span>
-                    <span className="text-[10px] text-gray-700">책갈피</span>
-                  </button>
-                  <button type="button" onClick={() => setShowLinkPreviewInput(!showLinkPreviewInput)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="링크 카드">
-                    <span className="text-2xl">📎</span>
-                    <span className="text-[10px] text-gray-700">링크 카드</span>
-                  </button>
-                </div>
-                <div className="word-group-label">링크</div>
-              </div>
-
-              {/* 머리글/바닥글 */}
-              <div className="word-group flex flex-col items-center px-3 relative">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={() => setEditingHeaderFooter(editingHeaderFooter === 'header' ? null : 'header')} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editingHeaderFooter === 'header' ? 'bg-blue-200' : ''}`} title="머리글">
-                    <span className="text-2xl">▭</span>
-                    <span className="text-[10px] text-gray-700">머리글</span>
-                  </button>
-                  <button type="button" onClick={() => setEditingHeaderFooter(editingHeaderFooter === 'footer' ? null : 'footer')} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editingHeaderFooter === 'footer' ? 'bg-blue-200' : ''}`} title="바닥글">
-                    <span className="text-2xl">▬</span>
-                    <span className="text-[10px] text-gray-700">바닥글</span>
-                  </button>
-                  <button type="button" onClick={() => setShowPageNumberMenu(!showPageNumberMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="페이지 번호">
-                    <span className="text-2xl">#</span>
-                    <span className="text-[10px] text-gray-700">페이지</span>
-                  </button>
-                </div>
-                <div className="word-group-label">머리글/바닥글</div>
-                {showPageNumberMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[200px]">
-                    <button type="button" onClick={() => setPageNumber('top')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▲ 페이지 위쪽</button>
-                    <button type="button" onClick={() => setPageNumber('bottom')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▼ 페이지 아래쪽</button>
-                    <button type="button" onClick={() => setPageNumber('inline')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">◎ 현재 위치</button>
+                  <div className="word-group-col" style={{ gap: 2 }}>
+                    <button type="button" onClick={() => setShowShapesMenu(!showShapesMenu)} className="word-btn-small" title="도형">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><rect x="1" y="6" width="6" height="6" stroke="#2b579a" strokeWidth="1.2" fill="none"/><circle cx="11" cy="5" r="3" stroke="#2b579a" strokeWidth="1.2" fill="none"/></svg>
+                      <span>도형 ▾</span>
+                    </button>
+                    <button type="button" onClick={() => setShowSmartArtMenu(!showSmartArtMenu)} className="word-btn-small" title="SmartArt">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="4" height="4" fill="#2b579a"/><rect x="11" y="2" width="4" height="4" fill="#70ad47"/><rect x="6" y="10" width="4" height="4" fill="#c55a11"/><path d="M3 6v2h10v2" stroke="#605e5c" strokeWidth="1"/></svg>
+                      <span>SmartArt ▾</span>
+                    </button>
+                    <button type="button" onClick={() => setShowChartDialog(true)} className="word-btn-small" title="차트">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><rect x="2" y="10" width="2" height="4" fill="#2b579a"/><rect x="6" y="6" width="2" height="8" fill="#70ad47"/><rect x="10" y="2" width="2" height="12" fill="#c55a11"/></svg>
+                      <span>차트</span>
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {/* 도형 / SmartArt / WordArt */}
-              <div className="word-group flex flex-col items-center px-3 relative">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={() => setShowShapesMenu(!showShapesMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="도형">
-                    <span className="text-2xl">◆</span>
-                    <span className="text-[10px] text-gray-700">도형</span>
-                  </button>
-                  <button type="button" onClick={() => setShowSmartArtMenu(!showSmartArtMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="SmartArt">
-                    <span className="text-2xl">⚙</span>
-                    <span className="text-[10px] text-gray-700">SmartArt</span>
-                  </button>
-                  <button type="button" onClick={() => setShowWordArtMenu(!showWordArtMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="WordArt">
-                    <span className="text-2xl font-bold" style={{ background: 'linear-gradient(45deg,#2563eb,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>A</span>
-                    <span className="text-[10px] text-gray-700">WordArt</span>
-                  </button>
                 </div>
-                <div className="word-group-label">일러스트</div>
+                <div className="word-group-label">일러스트레이션</div>
                 {showShapesMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[320px]">
                     <div className="text-xs font-semibold text-gray-700 mb-2">도형</div>
                     <div className="grid grid-cols-6 gap-1">
-                      {[
-                        { k: 'rect', s: '▭' }, { k: 'circle', s: '◯' }, { k: 'triangle', s: '△' },
-                        { k: 'diamond', s: '◇' }, { k: 'pentagon', s: '⬠' }, { k: 'hexagon', s: '⬡' },
-                        { k: 'arrow', s: '→' }, { k: 'line', s: '─' }, { k: 'star', s: '☆' },
-                        { k: 'callout', s: '💬' }, { k: 'heart', s: '♡' }, { k: 'cloud', s: '☁' },
-                      ].map(it => (
-                        <button key={it.k} type="button" onClick={() => insertShape(it.k)} className="p-2 text-xl hover:bg-blue-100 rounded border border-gray-200">{it.s}</button>
+                      {[{ k: 'rect', s: '▭' }, { k: 'circle', s: '◯' }, { k: 'triangle', s: '△' }, { k: 'diamond', s: '◇' }, { k: 'pentagon', s: '⬠' }, { k: 'hexagon', s: '⬡' }, { k: 'arrow', s: '→' }, { k: 'line', s: '─' }, { k: 'star', s: '☆' }, { k: 'callout', s: '◉' }, { k: 'heart', s: '♡' }, { k: 'cloud', s: '☁' }].map(it => (
+                        <button key={it.k} type="button" onClick={() => insertShape(it.k)} className="p-2 text-xl hover:bg-blue-50 rounded border border-gray-200">{it.s}</button>
                       ))}
                     </div>
                   </div>
                 )}
                 {showSmartArtMenu && (
                   <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[280px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">SmartArt 레이아웃</div>
+                    <div className="text-xs font-semibold text-gray-700 mb-2">SmartArt</div>
                     <div className="grid grid-cols-2 gap-1.5">
-                      <button type="button" onClick={() => insertSmartArt('list')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">📋 목록형</button>
-                      <button type="button" onClick={() => insertSmartArt('process')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">➡ 프로세스형</button>
-                      <button type="button" onClick={() => insertSmartArt('cycle')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">🔄 주기형</button>
-                      <button type="button" onClick={() => insertSmartArt('hierarchy')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">🏢 계층 구조형</button>
-                      <button type="button" onClick={() => insertSmartArt('relation')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">⚛ 관계형</button>
-                      <button type="button" onClick={() => insertSmartArt('pyramid')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">△ 피라미드형</button>
-                    </div>
-                  </div>
-                )}
-                {showWordArtMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[300px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">WordArt 스타일</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {['gradient', 'outline', 'shadow', 'neon', 'emboss', 'rainbow'].map(s => (
-                        <button key={s} type="button" onClick={() => insertWordArt(s)} className={`px-2 py-3 text-base font-bold wordart-sample wordart-${s} border border-gray-200 rounded hover:bg-blue-50`}>가나</button>
-                      ))}
+                      <button type="button" onClick={() => insertSmartArt('list')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">목록형</button>
+                      <button type="button" onClick={() => insertSmartArt('process')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">프로세스형</button>
+                      <button type="button" onClick={() => insertSmartArt('cycle')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">주기형</button>
+                      <button type="button" onClick={() => insertSmartArt('hierarchy')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">계층구조형</button>
+                      <button type="button" onClick={() => insertSmartArt('relation')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">관계형</button>
+                      <button type="button" onClick={() => insertSmartArt('pyramid')} className="px-2 py-3 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">피라미드형</button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 기호 / 수식 / 페이지 나누기 */}
-              <div className="word-group flex flex-col items-center px-3 relative">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={() => setShowSymbolPicker(!showSymbolPicker)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="기호">
-                    <span className="text-2xl">Ω</span>
-                    <span className="text-[10px] text-gray-700">기호</span>
-                  </button>
-                  <button type="button" onClick={() => setShowEquationDialog(true)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="수식">
-                    <span className="text-2xl">∑</span>
-                    <span className="text-[10px] text-gray-700">수식</span>
-                  </button>
-                  <button type="button" onClick={insertPageBreakNow} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="페이지 나누기 (Ctrl+Enter)">
-                    <span className="text-2xl">⇅</span>
-                    <span className="text-[10px] text-gray-700">페이지 나눔</span>
-                  </button>
+              {/* 링크 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={openHyperlinkDialog} className="word-btn-large" title="하이퍼링크 (Ctrl+K)">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><path d="M10 14a4 4 0 015.66 0l2.83-2.83a4 4 0 00-5.66-5.66L11 7.4" stroke="#2b579a" strokeWidth="1.7" fill="none" strokeLinecap="round"/><path d="M14 10a4 4 0 01-5.66 0l-2.83 2.83a4 4 0 005.66 5.66L13 16.6" stroke="#2b579a" strokeWidth="1.7" fill="none" strokeLinecap="round"/></svg>
+                      <span className="word-btn-label">링크</span>
+                    </button>
+                  </div>
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => setShowBookmarkDialog(true)} className="word-btn-large" title="책갈피">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><path d="M6 3h12v18l-6-4-6 4z" stroke="#2b579a" strokeWidth="1.6" fill="#ffffff"/></svg>
+                      <span className="word-btn-label">책갈피</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="word-group-label">링크</div>
+              </div>
+
+              {/* 텍스트 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => setShowWordArtMenu(!showWordArtMenu)} className="word-btn-large" title="WordArt">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="wa1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2b579a"/><stop offset="1" stopColor="#e74c3c"/></linearGradient></defs><text x="12" y="17" textAnchor="middle" fontSize="18" fontWeight="800" fill="url(#wa1)" style={{ fontFamily: 'Georgia,serif' }}>A</text></svg>
+                      <span className="word-btn-label">WordArt ▾</span>
+                    </button>
+                    {showWordArtMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[300px]">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">WordArt 스타일</div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {['gradient', 'outline', 'shadow', 'neon', 'emboss', 'rainbow'].map(sv => (
+                            <button key={sv} type="button" onClick={() => insertWordArt(sv)} className={`px-2 py-3 text-base font-bold wordart-sample wordart-${sv} border border-gray-200 rounded hover:bg-blue-50`}>가나</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="word-group-col" style={{ gap: 2 }}>
+                    <button type="button" onClick={() => setShowLinkPreviewInput(!showLinkPreviewInput)} className="word-btn-small" title="링크 카드">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1" stroke="#2b579a" strokeWidth="1.2"/><rect x="3" y="5" width="4" height="6" fill="#2b579a" opacity="0.3"/><line x1="8" y1="6" x2="13" y2="6" stroke="#605e5c"/><line x1="8" y1="9" x2="13" y2="9" stroke="#605e5c"/></svg>
+                      <span>링크 카드</span>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className="word-btn-small" title="구분선">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><line x1="1" y1="8" x2="15" y2="8" stroke="#605e5c" strokeWidth="1.5"/></svg>
+                      <span>구분선</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="word-group-label">텍스트</div>
+              </div>
+
+              {/* 기호 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => setShowEquationDialog(true)} className="word-btn-large" title="수식">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><text x="12" y="17" textAnchor="middle" fontSize="18" fill="#2b579a" style={{ fontFamily: 'Cambria Math,Cambria,serif' }}>π</text></svg>
+                      <span className="word-btn-label">수식 ▾</span>
+                    </button>
+                  </div>
+                  <div className="word-group-col" style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => setShowSymbolPicker(!showSymbolPicker)} className="word-btn-large" title="기호">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><text x="12" y="17" textAnchor="middle" fontSize="16" fontWeight="700" fill="#2b579a">Ω</text></svg>
+                      <span className="word-btn-label">기호 ▾</span>
+                    </button>
+                    {showSymbolPicker && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[380px] max-h-[260px] overflow-auto">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">기호</div>
+                        <div className="grid grid-cols-10 gap-1">
+                          {['©','®','™','§','¶','†','‡','•','·','...','«','»','EUR','£','¥','¢','°','±','×','÷','≠','≤','≥','≈','∞','∑','∏','√','∫','∂','∇','∈','∉','∋','⊂','⊃','∪','∩','∅','Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω','α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω','←','↑','→','↓','↔','↕','⇐','⇑','⇒','⇓','⇔','★','☆','♠','♣','♥','♦','♪','♫','☎','✓','✗','✉','❤','✦'].map((sy, i) => (
+                            <button key={i} type="button" onClick={() => insertSymbol(sy)} className="p-1 text-base hover:bg-blue-50 rounded border border-gray-100">{sy}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="word-group-label">기호</div>
-                {showSymbolPicker && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[380px] max-h-[260px] overflow-auto">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">기호 삽입</div>
-                    <div className="grid grid-cols-10 gap-1">
-                      {['©','®','™','§','¶','†','‡','•','·','…','«','»','€','£','¥','¢','°','±','×','÷','≠','≤','≥','≈','∞','∑','∏','√','∫','∂','∇','∈','∉','∋','⊂','⊃','∪','∩','∅','Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω','α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω','←','↑','→','↓','↔','↕','⇐','⇑','⇒','⇓','⇔','★','☆','♠','♣','♥','♦','♪','♫','☎','✓','✗','✉','❤','✦'].map((s, i) => (
-                        <button key={i} type="button" onClick={() => insertSymbol(s)} className="p-1 text-base hover:bg-blue-100 rounded border border-gray-100">{s}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
           {/* ========== 레이아웃 탭 ========== */}
           {activeTab === 'layout' && (
-            <div className="flex items-stretch gap-0 min-h-[92px]">
+            <div className="word-ribbon-tab">
               {/* 페이지 설정 */}
-              <div className="word-group flex flex-col items-center px-3 relative">
-                <div className="flex items-start gap-2 flex-1">
-                  <button type="button" onClick={() => setShowMarginsMenu(!showMarginsMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="여백">
-                    <span className="text-2xl">▤</span>
-                    <span className="text-[10px] text-gray-700">여백</span>
-                  </button>
-                  <button type="button" onClick={() => setShowOrientationMenu(!showOrientationMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="용지 방향">
-                    <span className="text-2xl">{pageOrientation === 'portrait' ? '▯' : '▭'}</span>
-                    <span className="text-[10px] text-gray-700">방향</span>
-                  </button>
-                  <button type="button" onClick={() => setShowSizeMenu(!showSizeMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="용지 크기">
-                    <span className="text-2xl">📄</span>
-                    <span className="text-[10px] text-gray-700">크기</span>
-                  </button>
-                  <button type="button" onClick={() => setShowColumnsMenu(!showColumnsMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="단 나누기">
-                    <span className="text-2xl">▥</span>
-                    <span className="text-[10px] text-gray-700">단</span>
-                  </button>
-                  <button type="button" onClick={() => setShowBreaksMenu(!showBreaksMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="나누기">
-                    <span className="text-2xl">⇥</span>
-                    <span className="text-[10px] text-gray-700">나누기</span>
-                  </button>
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col" style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => setShowMarginsMenu(!showMarginsMenu)} className="word-btn-large" title="여백">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" stroke="#605e5c" strokeWidth="1.3" fill="#ffffff"/><rect x="6" y="6" width="12" height="12" stroke="#2b579a" strokeWidth="1" strokeDasharray="1.5 1.5" fill="none"/></svg>
+                      <span className="word-btn-label">여백 ▾</span>
+                    </button>
+                    {showMarginsMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[280px]">
+                        <div className="text-xs font-semibold text-gray-700 mb-2 px-1">여백</div>
+                        <button type="button" onClick={() => applyMarginsPreset('normal')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">보통 (2.54cm)</button>
+                        <button type="button" onClick={() => applyMarginsPreset('narrow')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">좁게 (1.27cm)</button>
+                        <button type="button" onClick={() => applyMarginsPreset('moderate')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">중간 (2.54 / 1.91cm)</button>
+                        <button type="button" onClick={() => applyMarginsPreset('wide')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">넓게 (2.54 / 5.08cm)</button>
+                        <button type="button" onClick={() => applyMarginsPreset('mirrored')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">대칭 (안쪽 3.18cm)</button>
+                        <div className="border-t border-gray-200 mt-1 pt-1">
+                          <button type="button" onClick={() => { setShowMarginsMenu(false); setShowCustomMargins(true) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">사용자 지정 여백...</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="word-group-col" style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => setShowOrientationMenu(!showOrientationMenu)} className="word-btn-large" title="용지 방향">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none">
+                        {pageOrientation === 'portrait'
+                          ? <rect x="7" y="3" width="10" height="18" stroke="#2b579a" strokeWidth="1.5" fill="#ffffff"/>
+                          : <rect x="3" y="7" width="18" height="10" stroke="#2b579a" strokeWidth="1.5" fill="#ffffff"/>}
+                      </svg>
+                      <span className="word-btn-label">용지 방향 ▾</span>
+                    </button>
+                    {showOrientationMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
+                        <button type="button" onClick={() => { setPageOrientation('portrait'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageOrientation === 'portrait' ? 'bg-blue-50' : ''}`}>세로</button>
+                        <button type="button" onClick={() => { setPageOrientation('landscape'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageOrientation === 'landscape' ? 'bg-blue-50' : ''}`}>가로</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="word-group-col" style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => setShowSizeMenu(!showSizeMenu)} className="word-btn-large" title="크기">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" stroke="#2b579a" strokeWidth="1.5" fill="#ffffff"/><text x="12" y="15" textAnchor="middle" fontSize="7" fontWeight="700" fill="#2b579a">{pageSize}</text></svg>
+                      <span className="word-btn-label">크기 ▾</span>
+                    </button>
+                    {showSizeMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[240px]">
+                        {(['A4','A3','A5','Letter','Legal'] as const).map(sz => (
+                          <button key={sz} type="button" onClick={() => { setPageSize(sz); setShowSizeMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageSize === sz ? 'bg-blue-50' : ''}`}>
+                            {sz} ({pageSizeDims[sz][0]} × {pageSizeDims[sz][1]} cm)
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="word-group-col" style={{ gap: 2, position: 'relative' }}>
+                    <button type="button" onClick={() => setShowColumnsMenu(!showColumnsMenu)} className="word-btn-small" title="단">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="6" height="12" stroke="#2b579a" strokeWidth="1" fill="none"/><rect x="9" y="2" width="6" height="12" stroke="#2b579a" strokeWidth="1" fill="none"/></svg>
+                      <span>단 ▾</span>
+                    </button>
+                    <button type="button" onClick={() => setShowBreaksMenu(!showBreaksMenu)} className="word-btn-small" title="나누기">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><line x1="1" y1="4" x2="15" y2="4" stroke="#605e5c"/><line x1="1" y1="8" x2="15" y2="8" stroke="#2b579a" strokeWidth="1.5" strokeDasharray="2 2"/><line x1="1" y1="12" x2="15" y2="12" stroke="#605e5c"/></svg>
+                      <span>나누기 ▾</span>
+                    </button>
+                    <button type="button" onClick={() => { /* line numbers placeholder */ }} className="word-btn-small" title="줄 번호">
+                      <svg className="word-icon-16" viewBox="0 0 16 16" fill="none"><text x="3" y="6" fontSize="5" fill="#605e5c">1</text><text x="3" y="10" fontSize="5" fill="#605e5c">2</text><text x="3" y="14" fontSize="5" fill="#605e5c">3</text><line x1="7" y1="3" x2="15" y2="3" stroke="#605e5c"/><line x1="7" y1="7" x2="15" y2="7" stroke="#605e5c"/><line x1="7" y1="11" x2="15" y2="11" stroke="#605e5c"/></svg>
+                      <span>줄 번호</span>
+                    </button>
+                    {showColumnsMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
+                        <button type="button" onClick={() => { setPageColumns(1); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageColumns === 1 ? 'bg-blue-50' : ''}`}>하나</button>
+                        <button type="button" onClick={() => { setPageColumns(2); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageColumns === 2 ? 'bg-blue-50' : ''}`}>둘</button>
+                        <button type="button" onClick={() => { setPageColumns(3); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded ${pageColumns === 3 ? 'bg-blue-50' : ''}`}>셋</button>
+                      </div>
+                    )}
+                    {showBreaksMenu && (
+                      <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
+                        <button type="button" onClick={insertPageBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">페이지 나누기</button>
+                        <button type="button" onClick={insertColumnBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">단 나누기</button>
+                        <button type="button" onClick={() => { editor.chain().focus().setHorizontalRule().run(); setShowBreaksMenu(false) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded">구분선</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="word-group-label">페이지 설정</div>
-
-                {showMarginsMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[260px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2 px-1">여백</div>
-                    <button type="button" onClick={() => applyMarginsPreset('normal')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">보통 (위/아래/좌/우 2.54cm)</button>
-                    <button type="button" onClick={() => applyMarginsPreset('narrow')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">좁게 (1.27cm)</button>
-                    <button type="button" onClick={() => applyMarginsPreset('moderate')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">중간 (2.54 / 1.91cm)</button>
-                    <button type="button" onClick={() => applyMarginsPreset('wide')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">넓게 (2.54 / 5.08cm)</button>
-                    <button type="button" onClick={() => applyMarginsPreset('mirrored')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">대칭 (안쪽 3.18cm)</button>
-                    <div className="border-t border-gray-200 mt-1 pt-1">
-                      <button type="button" onClick={() => { setShowMarginsMenu(false); setShowCustomMargins(true) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">사용자 지정 여백...</button>
-                    </div>
-                  </div>
-                )}
-
-                {showOrientationMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
-                    <button type="button" onClick={() => { setPageOrientation('portrait'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageOrientation === 'portrait' ? 'bg-blue-100' : ''}`}>▯ 세로</button>
-                    <button type="button" onClick={() => { setPageOrientation('landscape'); setShowOrientationMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageOrientation === 'landscape' ? 'bg-blue-100' : ''}`}>▭ 가로</button>
-                  </div>
-                )}
-
-                {showSizeMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
-                    {(['A4','A3','A5','Letter','Legal'] as const).map(sz => (
-                      <button key={sz} type="button" onClick={() => { setPageSize(sz); setShowSizeMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageSize === sz ? 'bg-blue-100' : ''}`}>
-                        {sz} ({pageSizeDims[sz][0]} × {pageSizeDims[sz][1]} cm)
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {showColumnsMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[180px]">
-                    <button type="button" onClick={() => { setPageColumns(1); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 1 ? 'bg-blue-100' : ''}`}>▯ 하나</button>
-                    <button type="button" onClick={() => { setPageColumns(2); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 2 ? 'bg-blue-100' : ''}`}>▯▯ 둘</button>
-                    <button type="button" onClick={() => { setPageColumns(3); setShowColumnsMenu(false) }} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded ${pageColumns === 3 ? 'bg-blue-100' : ''}`}>▯▯▯ 셋</button>
-                  </div>
-                )}
-
-                {showBreaksMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[220px]">
-                    <button type="button" onClick={insertPageBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">⇅ 페이지 나누기</button>
-                    <button type="button" onClick={insertColumnBreakNow} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">▥ 단 나누기</button>
-                    <button type="button" onClick={() => { editor.chain().focus().setHorizontalRule().run(); setShowBreaksMenu(false) }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">― 구분선</button>
-                  </div>
-                )}
               </div>
 
-              {/* 단락 - 들여쓰기/간격 */}
-              <div className="word-group flex flex-col items-center px-3">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 text-[11px] text-gray-700">
-                  <label className="flex items-center gap-1">왼쪽:
-                    <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentLeft(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
-                    <span className="text-[9px]">px</span>
-                  </label>
-                  <label className="flex items-center gap-1">오른쪽:
-                    <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentRight(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
-                    <span className="text-[9px]">px</span>
-                  </label>
-                  <label className="flex items-center gap-1">단락 앞:
-                    <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceBefore(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
-                    <span className="text-[9px]">px</span>
-                  </label>
-                  <label className="flex items-center gap-1">단락 뒤:
-                    <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceAfter(Number(e.target.value))} className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs" />
-                    <span className="text-[9px]">px</span>
-                  </label>
+              {/* 단락 */}
+              <div className="word-group">
+                <div className="word-group-body" style={{ padding: '4px 6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 8px', fontSize: 11, color: '#323130', alignItems: 'center' }}>
+                    <div style={{ gridColumn: '1 / 3', fontSize: 10, color: '#605e5c', fontWeight: 600, marginBottom: 2 }}>들여쓰기</div>
+                    <label>왼쪽</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentLeft(Number(e.target.value))} className="word-num-input" />
+                      <span style={{ fontSize: 9 }}>px</span>
+                    </div>
+                    <label>오른쪽</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="0" max="480" step="8" defaultValue="0" onChange={(e) => setParaIndentRight(Number(e.target.value))} className="word-num-input" />
+                      <span style={{ fontSize: 9 }}>px</span>
+                    </div>
+                    <div style={{ gridColumn: '1 / 3', fontSize: 10, color: '#605e5c', fontWeight: 600, marginTop: 3, marginBottom: 2 }}>간격</div>
+                    <label>이전</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceBefore(Number(e.target.value))} className="word-num-input" />
+                      <span style={{ fontSize: 9 }}>px</span>
+                    </div>
+                    <label>이후</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="0" max="96" step="2" defaultValue="0" onChange={(e) => setParaSpaceAfter(Number(e.target.value))} className="word-num-input" />
+                      <span style={{ fontSize: 9 }}>px</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="word-group-label">단락</div>
               </div>
 
-              {/* 현재 설정 표시 */}
-              <div className="word-group flex flex-col items-center px-3">
-                <div className="flex flex-col gap-1 flex-1 text-[11px] text-gray-600">
-                  <div>용지: <b>{pageSize}</b> {pageOrientation === 'portrait' ? '세로' : '가로'}</div>
-                  <div>여백: {pageMargins.top} / {pageMargins.right} / {pageMargins.bottom} / {pageMargins.left}</div>
-                  <div>단: {pageColumns}개</div>
+              {/* 정렬 / 상태 */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col" style={{ alignItems: 'flex-start', padding: '4px 8px', gap: 3, fontSize: 11, color: '#605e5c', minWidth: 140 }}>
+                    <div>용지: <span style={{ color: '#323130', fontWeight: 600 }}>{pageSize}</span> {pageOrientation === 'portrait' ? '세로' : '가로'}</div>
+                    <div>여백: {pageMargins.top}/{pageMargins.right}/{pageMargins.bottom}/{pageMargins.left}</div>
+                    <div>단: {pageColumns}개</div>
+                  </div>
                 </div>
                 <div className="word-group-label">현재 상태</div>
               </div>
@@ -3036,6 +3041,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* === 버튼 종류 === */
         .word-icon-24 { width: 24px; height: 24px; }
+        .word-icon-16 { width: 16px; height: 16px; flex-shrink: 0; }
+        .word-num-input {
+          width: 50px;
+          height: 20px;
+          padding: 1px 3px;
+          border: 1px solid #8a8886;
+          border-radius: 2px;
+          font-size: 11px;
+          background: #ffffff;
+        }
+        .word-num-input:focus { outline: none; border-color: #0078d4; }
         .word-btn-large {
           display: flex;
           flex-direction: column;
