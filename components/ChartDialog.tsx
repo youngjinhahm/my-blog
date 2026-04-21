@@ -3,7 +3,13 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Chart as ChartJS, registerables } from 'chart.js'
 
-ChartJS.register(...registerables)
+let chartRegistered = false
+function ensureChartRegistered() {
+  if (!chartRegistered && typeof window !== 'undefined') {
+    ChartJS.register(...registerables)
+    chartRegistered = true
+  }
+}
 
 interface ChartDialogProps {
   isOpen: boolean
@@ -276,6 +282,7 @@ export default function ChartDialog({
   // 차트 렌더링
   useEffect(() => {
     if (!isOpen || !canvasRef.current) return
+    ensureChartRegistered()
 
     const ctx = canvasRef.current.getContext('2d')
     if (!ctx) return

@@ -100,7 +100,8 @@ const StyledTableHeader = TableHeader.extend({
 })
 import { useRef, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import ChartDialog from './ChartDialog'
+import dynamic from 'next/dynamic'
+const ChartDialog = dynamic(() => import('./ChartDialog'), { ssr: false })
 
 // 커스텀 FontSize Mark
 const FontSize = Mark.create({
