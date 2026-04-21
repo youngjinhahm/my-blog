@@ -519,6 +519,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false)
   const [showCaseMenu, setShowCaseMenu] = useState(false)
   const [showChartDialog, setShowChartDialog] = useState(false)
+  const [showImageToolbar, setShowImageToolbar] = useState(false)
+  const [imageToolbarPos, setImageToolbarPos] = useState({ top: 0, left: 0 })
+  const replaceImageRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -658,7 +661,25 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           }
         }
 
-        // 3) 진짜 이미지 (HTML/text 대안이 없을 때만 업로드)
+        // 3) Excel 차트 등: HTML에 <table>은 없지만 <img> 가 있는 경우
+        //    (Excel 차트 복사 시 text/html에 <img> + image/png 동시 제공)
+        if (html && !/<table[\s>]/i.test(html) && /<img[\s>]/i.test(html)) {
+          const items = cd.items
+          if (items) {
+            for (let i = 0; i < items.length; i++) {
+              if (items[i].type.indexOf('image') !== -1) {
+                event.preventDefault()
+                const file = items[i].getAsFile()
+                if (file) uploadImage(file)
+                return true
+              }
+            }
+          }
+          // <img> HTML은 있지만 image item이 없으면 기본 파서에 맡김
+          return false
+        }
+
+        // 4) 순수 이미지 (스크린샷 등 HTML/text 대안 없음)
         const items = cd.items
         if (items && !html && !text) {
           for (let i = 0; i < items.length; i++) {
@@ -667,6 +688,25 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               const file = items[i].getAsFile()
               if (file) uploadImage(file)
               return true
+            }
+          }
+        }
+
+        // 5) Excel 차트: HTML도 text도 없고 image만 있는 경우 (일부 Excel 버전)
+        if (items) {
+          const hasText = html || text
+          if (!hasText) return false
+          // HTML은 있는데 table/img 아닌 경우 — image item 체크
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+              // HTML이 의미없는 래퍼만 포함하면 이미지로 처리
+              const stripped = html.replace(/<\/?[^>]+(>|$)/g, '').trim()
+              if (!stripped || stripped.length < 10) {
+                event.preventDefault()
+                const file = items[i].getAsFile()
+                if (file) uploadImage(file)
+                return true
+              }
             }
           }
         }
@@ -683,6 +723,61 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       setWordCount(words.length)
     }
   }, [editor])
+
+  // 이미지 선택 감지 → 플로팅 툴바 표시
+  const isImageSelected = editor?.isActive('resizableImage') ?? false
+  useEffect(() => {
+    if (!editor || !isImageSelected) {
+      setShowImageToolbar(false)
+      return
+    }
+    // 선택된 이미지 DOM 위치 찾기
+    const { node } = editor.state.selection as any
+    if (!node) { setShowImageToolbar(false); return }
+    const dom = editor.view.nodeDOM(editor.state.selection.from) as HTMLElement
+    if (!dom) { setShowImageToolbar(false); return }
+    const img = dom.tagName === 'IMG' ? dom : dom.querySelector('img')
+    if (!img) { setShowImageToolbar(false); return }
+    const rect = img.getBoundingClientRect()
+    const editorRect = editor.view.dom.closest('.bg-white')?.getBoundingClientRect()
+    if (editorRect) {
+      setImageToolbarPos({
+        top: rect.top - editorRect.top - 44,
+        left: rect.left - editorRect.left + rect.width / 2,
+      })
+    }
+    setShowImageToolbar(true)
+  }, [isImageSelected, editor?.state.selection])
+
+  // 이미지 편집 함수들
+  const setImageSize = (widthPercent: number) => {
+    if (!editor) return
+    const { node } = editor.state.selection as any
+    if (!node) return
+    const editorWidth = editor.view.dom.clientWidth
+    const newWidth = Math.round(editorWidth * widthPercent / 100)
+    editor.chain().focus().updateAttributes('resizableImage', { width: newWidth }).run()
+  }
+
+  const setImageAlign = (align: string) => {
+    if (!editor) return
+    editor.chain().focus().updateAttributes('resizableImage', { align }).run()
+  }
+
+  const handleReplaceImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !editor) return
+    const url = await uploadImageAndGetUrl(file)
+    if (url) {
+      editor.chain().focus().updateAttributes('resizableImage', { src: url }).run()
+    }
+    e.target.value = ''
+  }
+
+  const deleteSelectedImage = () => {
+    if (!editor) return
+    editor.chain().focus().deleteSelection().run()
+  }
 
   // 현재 커서가 표 안에 있는지 감지 → 컨텍스트 탭 자동 활성화
   const isInTable = editor?.isActive('table') ?? false
@@ -1672,7 +1767,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       {/* 에디터 (A4 narrow margin 1.27cm 레이아웃) */}
       <div className={isFullscreen ? 'h-[calc(100vh-200px)] overflow-auto bg-gray-200 p-4' : 'bg-gray-200 p-4'}>
         <div
-          className="mx-auto bg-white shadow-md"
+          className="mx-auto bg-white shadow-md relative"
           style={{
             width: '21cm',
             maxWidth: '100%',
@@ -1682,6 +1777,27 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           }}
         >
           <EditorContent editor={editor} />
+          {/* 이미지 선택 시 플로팅 툴바 */}
+          {showImageToolbar && isImageSelected && (
+            <div
+              className="absolute z-30 flex items-center gap-1 bg-white border border-gray-300 rounded-lg shadow-lg px-2 py-1"
+              style={{ top: `${imageToolbarPos.top}px`, left: `${imageToolbarPos.left}px`, transform: 'translateX(-50%)' }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <button type="button" onClick={() => setImageSize(25)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="25%">25%</button>
+              <button type="button" onClick={() => setImageSize(50)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="50%">50%</button>
+              <button type="button" onClick={() => setImageSize(75)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="75%">75%</button>
+              <button type="button" onClick={() => setImageSize(100)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="100%">100%</button>
+              <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
+              <button type="button" onClick={() => setImageAlign('left')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="왼쪽 정렬">⫷</button>
+              <button type="button" onClick={() => setImageAlign('center')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="가운데">≡</button>
+              <button type="button" onClick={() => setImageAlign('right')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="오른쪽 정렬">⫸</button>
+              <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
+              <button type="button" onClick={() => replaceImageRef.current?.click()} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="이미지 교체">교체</button>
+              <button type="button" onClick={deleteSelectedImage} className="px-1.5 py-0.5 text-[10px] hover:bg-red-100 text-red-600 rounded" title="삭제">삭제</button>
+              <input ref={replaceImageRef} type="file" accept="image/*" onChange={handleReplaceImage} className="hidden" />
+            </div>
+          )}
         </div>
       </div>
 
