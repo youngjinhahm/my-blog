@@ -294,9 +294,16 @@ export default function ChartDialog({
 
     const themeData = applyColorTheme(colorTheme, data)
 
+    // Chart.js 타입 매핑 (column→bar, bar→bar+indexAxis:y, area→line)
+    const chartJsType = (() => {
+      if (chartType === 'column' || chartType === 'combo' || chartType === 'bar') return 'bar'
+      if (chartType === 'area') return 'line'
+      return chartType
+    })()
+
     // 차트 타입별 설정
     let chartConfig: any = {
-      type: chartType === 'combo' ? 'bar' : chartType === 'area' ? 'line' : chartType,
+      type: chartJsType,
       data: { ...themeData },
       options: {
         responsive: true,
@@ -325,6 +332,10 @@ export default function ChartDialog({
 
     // 차트별 맞춤 옵션
     if (chartType === 'column' || chartType === 'bar') {
+      // 가로 막대 = indexAxis 'y'
+      if (chartType === 'bar') {
+        chartConfig.options.indexAxis = 'y'
+      }
       chartConfig.options.scales = {
         x: {
           title: { display: showXAxisTitle, text: xAxisTitle, font: { weight: 'bold' } },
