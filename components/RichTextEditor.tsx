@@ -1388,6 +1388,24 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }
 
+  const togglePainter = () => {
+    if (!editor) return
+    if (painterMode) {
+      setPainterMode(false)
+      setPainterMarks(null)
+      return
+    }
+    const marks: any = {}
+    marks.bold = editor.isActive('bold')
+    marks.italic = editor.isActive('italic')
+    marks.underline = editor.isActive('underline')
+    marks.strike = editor.isActive('strike')
+    const attrs = editor.getAttributes('textStyle')
+    if (attrs && attrs.color) marks.color = attrs.color
+    setPainterMarks(marks)
+    setPainterMode(true)
+  }
+
   const findMatches = (): Array<{ from: number; to: number }> => {
     if (!editor || !findText) return []
     const matches: Array<{ from: number; to: number }> = []
@@ -1703,43 +1721,56 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         <div className="word-ribbon-body px-2 pt-2 pb-1" style={{ overflow: 'visible' }}>
           {/* ========== 홈 탭 ========== */}
           {activeTab === 'home' && (
-            <div className="flex items-stretch gap-0 min-h-[92px]">
-              {/* 클립보드 그룹 */}
-              <div className="word-group flex flex-col items-center px-2">
-                <div className="flex items-start gap-1 flex-1">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="실행 취소 (Ctrl+Z)">↶</button>
-                    <button type="button" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className="px-2 py-1 text-lg hover:bg-blue-100 rounded disabled:opacity-30" title="다시 실행 (Ctrl+Y)">↷</button>
+            <div className="word-ribbon-tab">
+              {/* ========== 클립보드 그룹 ========== */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col">
+                    <button type="button" onClick={() => { navigator.clipboard.readText().then(t => editor.chain().focus().insertContent(t).run()).catch(() => {}) }} className="word-btn-large" title="붙여넣기">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><path d="M9 2h6a1 1 0 011 1v1h3a1 1 0 011 1v15a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1h3V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" fill="#fff"/><rect x="8" y="2.5" width="8" height="3" rx="0.5" fill="#2b579a"/><line x1="7" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1"/><line x1="7" y1="13" x2="17" y2="13" stroke="currentColor" strokeWidth="1"/><line x1="7" y1="16" x2="14" y2="16" stroke="currentColor" strokeWidth="1"/></svg>
+                      <span className="word-btn-label">붙여넣기</span>
+                    </button>
+                  </div>
+                  <div className="word-group-col" style={{ gap: 2 }}>
+                    <button type="button" onClick={() => { try { document.execCommand('cut') } catch {} }} className="word-btn-small" title="잘라내기 (Ctrl+X)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.3"/><circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="1.3"/><line x1="8.5" y1="16" x2="20" y2="4" stroke="currentColor" strokeWidth="1.3"/><line x1="15.5" y1="16" x2="4" y2="4" stroke="currentColor" strokeWidth="1.3"/></svg>
+                      <span>잘라내기</span>
+                    </button>
+                    <button type="button" onClick={() => { try { document.execCommand('copy') } catch {} }} className="word-btn-small" title="복사 (Ctrl+C)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="8" y="4" width="12" height="14" rx="1" stroke="currentColor" strokeWidth="1.3" fill="#fff"/><path d="M5 8v10a2 2 0 002 2h9" stroke="currentColor" strokeWidth="1.3" fill="none"/></svg>
+                      <span>복사</span>
+                    </button>
+                    <button type="button" onClick={togglePainter} className={`word-btn-small ${painterMode ? 'word-btn-active' : ''}`} title="서식 복사">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h10v3H5z" fill="currentColor"/><path d="M15 5h2a2 2 0 012 2v3H13" stroke="currentColor" strokeWidth="1.3" fill="none"/><path d="M7 8v3h6v-1" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="8" y="13" width="4" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="#fde68a"/></svg>
+                      <span>서식 복사</span>
+                    </button>
                   </div>
                 </div>
-                <div className="word-group-label">실행</div>
+                <div className="word-group-label">클립보드</div>
               </div>
 
-              {/* 글꼴 그룹 (Font) */}
-              <div className="word-group flex flex-col items-center px-2">
-                <div className="flex flex-col gap-1 flex-1">
-                  <div className="flex items-center gap-1">
-                    <select onChange={handleFontFamilyChange} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white w-40 font-select" defaultValue="">
+              {/* ========== 글꼴 그룹 ========== */}
+              <div className="word-group">
+                <div className="word-group-body word-font-body">
+                  <div className="word-row">
+                    <select onChange={handleFontFamilyChange} className="word-font-select" defaultValue="">
                       <option value="">본문 폰트</option>
                       <optgroup label="최근 사용">
                         <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
-                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
+                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕 (Body)</option>
                         <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
                       </optgroup>
                       <optgroup label="한글 글꼴">
+                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
                         <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
                         <option value="'Noto Serif KR', serif" style={{ fontFamily: "'Noto Serif KR'" }}>Noto Serif KR</option>
                         <option value="'Nanum Gothic', sans-serif" style={{ fontFamily: "'Nanum Gothic'" }}>나눔고딕</option>
                         <option value="'Nanum Myeongjo', serif" style={{ fontFamily: "'Nanum Myeongjo'" }}>나눔명조</option>
                         <option value="'Nanum Pen Script', cursive" style={{ fontFamily: "'Nanum Pen Script'" }}>나눔손글씨 펜</option>
-                        <option value="'Nanum Brush Script', cursive" style={{ fontFamily: "'Nanum Brush Script'" }}>나눔손글씨 붓</option>
                         <option value="'Gowun Dodum', sans-serif" style={{ fontFamily: "'Gowun Dodum'" }}>고운돋움</option>
-                        <option value="'Gowun Batang', serif" style={{ fontFamily: "'Gowun Batang'" }}>고운바탕</option>
-                        <option value="'Gaegu', cursive" style={{ fontFamily: "'Gaegu'" }}>개구쟁이</option>
                         <option value="'Jua', sans-serif" style={{ fontFamily: "'Jua'" }}>주아체</option>
                         <option value="'Do Hyeon', sans-serif" style={{ fontFamily: "'Do Hyeon'" }}>도현체</option>
                         <option value="'Black Han Sans', sans-serif" style={{ fontFamily: "'Black Han Sans'" }}>블랙한산스</option>
-                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
                         <option value="'바탕', Batang, serif" style={{ fontFamily: "Batang, '바탕'" }}>바탕</option>
                         <option value="'굴림', Gulim, sans-serif" style={{ fontFamily: "Gulim, '굴림'" }}>굴림</option>
                         <option value="'돋움', Dotum, sans-serif" style={{ fontFamily: "Dotum, '돋움'" }}>돋움</option>
@@ -1751,117 +1782,150 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                         <option value="'Cambria', Georgia, serif" style={{ fontFamily: "Cambria, Georgia" }}>Cambria</option>
                         <option value="Garamond, 'Times New Roman', serif" style={{ fontFamily: "Garamond" }}>Garamond</option>
                         <option value="'Book Antiqua', 'Palatino Linotype', serif" style={{ fontFamily: "'Palatino Linotype'" }}>Palatino Linotype</option>
-                        <option value="'Baskerville', 'Baskerville Old Face', serif" style={{ fontFamily: "Baskerville" }}>Baskerville</option>
-                        <option value="'Courier New', Courier, monospace" style={{ fontFamily: "'Courier New'" }}>Courier New</option>
-                        <option value="'Lucida Bright', Georgia, serif" style={{ fontFamily: "'Lucida Bright'" }}>Lucida Bright</option>
+                        <option value="'Baskerville', serif" style={{ fontFamily: "Baskerville" }}>Baskerville</option>
                         <option value="'Playfair Display', serif" style={{ fontFamily: "'Playfair Display'" }}>Playfair Display</option>
                         <option value="'Merriweather', serif" style={{ fontFamily: "'Merriweather'" }}>Merriweather</option>
-                        <option value="'Lora', serif" style={{ fontFamily: "'Lora'" }}>Lora</option>
-                        <option value="'PT Serif', serif" style={{ fontFamily: "'PT Serif'" }}>PT Serif</option>
                       </optgroup>
                       <optgroup label="영문 Sans-serif">
                         <option value="Arial, Helvetica, sans-serif" style={{ fontFamily: "Arial" }}>Arial</option>
-                        <option value="'Arial Black', Arial, sans-serif" style={{ fontFamily: "'Arial Black'" }}>Arial Black</option>
-                        <option value="'Arial Narrow', Arial, sans-serif" style={{ fontFamily: "'Arial Narrow'" }}>Arial Narrow</option>
-                        <option value="Helvetica, Arial, sans-serif" style={{ fontFamily: "Helvetica" }}>Helvetica</option>
-                        <option value="Calibri, 'Segoe UI', sans-serif" style={{ fontFamily: "Calibri" }}>Calibri</option>
-                        <option value="'Segoe UI', Tahoma, sans-serif" style={{ fontFamily: "'Segoe UI'" }}>Segoe UI</option>
-                        <option value="Tahoma, Verdana, sans-serif" style={{ fontFamily: "Tahoma" }}>Tahoma</option>
-                        <option value="Verdana, Geneva, sans-serif" style={{ fontFamily: "Verdana" }}>Verdana</option>
+                        <option value="'Arial Black', sans-serif" style={{ fontFamily: "'Arial Black'" }}>Arial Black</option>
+                        <option value="'Arial Narrow', sans-serif" style={{ fontFamily: "'Arial Narrow'" }}>Arial Narrow</option>
+                        <option value="Helvetica, sans-serif" style={{ fontFamily: "Helvetica" }}>Helvetica</option>
+                        <option value="Calibri, sans-serif" style={{ fontFamily: "Calibri" }}>Calibri</option>
+                        <option value="'Segoe UI', sans-serif" style={{ fontFamily: "'Segoe UI'" }}>Segoe UI</option>
+                        <option value="Tahoma, sans-serif" style={{ fontFamily: "Tahoma" }}>Tahoma</option>
+                        <option value="Verdana, sans-serif" style={{ fontFamily: "Verdana" }}>Verdana</option>
                         <option value="'Trebuchet MS', sans-serif" style={{ fontFamily: "'Trebuchet MS'" }}>Trebuchet MS</option>
                         <option value="'Century Gothic', sans-serif" style={{ fontFamily: "'Century Gothic'" }}>Century Gothic</option>
-                        <option value="'Franklin Gothic Medium', sans-serif" style={{ fontFamily: "'Franklin Gothic Medium'" }}>Franklin Gothic</option>
-                        <option value="'Gill Sans', 'Gill Sans MT', sans-serif" style={{ fontFamily: "'Gill Sans'" }}>Gill Sans</option>
+                        <option value="'Gill Sans', sans-serif" style={{ fontFamily: "'Gill Sans'" }}>Gill Sans</option>
                         <option value="'Roboto', sans-serif" style={{ fontFamily: "'Roboto'" }}>Roboto</option>
                         <option value="'Open Sans', sans-serif" style={{ fontFamily: "'Open Sans'" }}>Open Sans</option>
                         <option value="'Lato', sans-serif" style={{ fontFamily: "'Lato'" }}>Lato</option>
                         <option value="'Montserrat', sans-serif" style={{ fontFamily: "'Montserrat'" }}>Montserrat</option>
                         <option value="'Inter', sans-serif" style={{ fontFamily: "'Inter'" }}>Inter</option>
-                        <option value="'Poppins', sans-serif" style={{ fontFamily: "'Poppins'" }}>Poppins</option>
                       </optgroup>
                       <optgroup label="모노스페이스">
-                        <option value="'Courier New', Courier, monospace" style={{ fontFamily: "'Courier New'" }}>Courier New</option>
-                        <option value="Consolas, 'Courier New', monospace" style={{ fontFamily: "Consolas" }}>Consolas</option>
-                        <option value="'Lucida Console', Monaco, monospace" style={{ fontFamily: "'Lucida Console'" }}>Lucida Console</option>
-                        <option value="Monaco, Menlo, monospace" style={{ fontFamily: "Monaco" }}>Monaco</option>
-                        <option value="Menlo, Consolas, monospace" style={{ fontFamily: "Menlo" }}>Menlo</option>
+                        <option value="'Courier New', monospace" style={{ fontFamily: "'Courier New'" }}>Courier New</option>
+                        <option value="Consolas, monospace" style={{ fontFamily: "Consolas" }}>Consolas</option>
+                        <option value="Monaco, monospace" style={{ fontFamily: "Monaco" }}>Monaco</option>
                         <option value="'JetBrains Mono', monospace" style={{ fontFamily: "'JetBrains Mono'" }}>JetBrains Mono</option>
                         <option value="'Fira Code', monospace" style={{ fontFamily: "'Fira Code'" }}>Fira Code</option>
                         <option value="'Source Code Pro', monospace" style={{ fontFamily: "'Source Code Pro'" }}>Source Code Pro</option>
                       </optgroup>
-                      <optgroup label="장식/표시">
-                        <option value="Impact, 'Arial Black', sans-serif" style={{ fontFamily: "Impact" }}>Impact</option>
-                        <option value="'Comic Sans MS', 'Marker Felt', cursive" style={{ fontFamily: "'Comic Sans MS'" }}>Comic Sans MS</option>
+                      <optgroup label="장식">
+                        <option value="Impact, sans-serif" style={{ fontFamily: "Impact" }}>Impact</option>
+                        <option value="'Comic Sans MS', cursive" style={{ fontFamily: "'Comic Sans MS'" }}>Comic Sans MS</option>
                         <option value="'Brush Script MT', cursive" style={{ fontFamily: "'Brush Script MT'" }}>Brush Script</option>
-                        <option value="'Copperplate', 'Copperplate Gothic Light', fantasy" style={{ fontFamily: "Copperplate" }}>Copperplate</option>
-                        <option value="'Papyrus', fantasy" style={{ fontFamily: "Papyrus" }}>Papyrus</option>
                       </optgroup>
                     </select>
-                    <select onChange={handleFontSizeChange} className="px-1 py-0.5 text-xs border border-gray-300 rounded bg-white w-14" defaultValue="">
-                      <option value="" disabled>크기</option>
+                    <select onChange={handleFontSizeChange} className="word-size-select" defaultValue="">
+                      <option value="" disabled>11</option>
                       {[8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(s => <option key={s} value={`${s}pt`}>{s}</option>)}
                     </select>
-                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(1)} className="w-6 h-6 text-xs hover:bg-blue-100 rounded" title="글자 크기 크게">A˄</button>
-                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(-1)} className="w-6 h-6 text-xs hover:bg-blue-100 rounded" title="글자 크기 작게">A˅</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(1)} className="word-btn-mini" title="글자 크기 크게">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="17" fontFamily="Arial" fontSize="16" fontWeight="700">A</text><text x="14" y="9" fontFamily="Arial" fontSize="9" fontWeight="700">^</text></svg>
+                    </button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(-1)} className="word-btn-mini" title="글자 크기 작게">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="17" fontFamily="Arial" fontSize="13" fontWeight="700">A</text><text x="14" y="17" fontFamily="Arial" fontSize="9" fontWeight="700">v</text></svg>
+                    </button>
                     <div className="relative">
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowCaseMenu(!showCaseMenu); setShowLineSpacingMenu(false) }} className="w-8 h-6 text-xs hover:bg-blue-100 rounded" title="대/소문자 바꾸기">Aa▾</button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowCaseMenu(!showCaseMenu); setShowLineSpacingMenu(false) }} className="word-btn-mini word-btn-chevron" title="대/소문자 바꾸기">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="2" y="18" fontFamily="Arial" fontSize="14" fontWeight="700">Aa</text></svg>
+                        <span className="word-chevron">▾</span>
+                      </button>
                       {showCaseMenu && (
-                        <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 shadow-lg rounded mt-1 w-44 py-1 text-xs">
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('sentence')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">문장의 첫 글자만 대문자</button>
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('lower')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">소문자로 (lowercase)</button>
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('upper')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">대문자로 (UPPERCASE)</button>
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('title')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">단어 첫 글자 대문자</button>
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('toggle')} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">대/소문자 전환</button>
+                        <div className="absolute top-full left-0 z-30 bg-white border border-[#c8c6c4] shadow-[0_4px_12px_rgba(0,0,0,0.15)] mt-0.5 w-48 py-1 text-xs">
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('sentence')} className="word-menu-item">문장의 첫 글자 대문자</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('lower')} className="word-menu-item">소문자로 (lowercase)</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('upper')} className="word-menu-item">대문자로 (UPPERCASE)</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('title')} className="word-menu-item">각 단어 첫 글자</button>
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => changeCase('toggle')} className="word-menu-item">대/소문자 전환</button>
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="서식 지우기">✕ᴬ</button>
+                    <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className="word-btn-mini" title="모든 서식 지우기">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><text x="3" y="16" fontFamily="Arial" fontSize="12" fontWeight="700" fill="currentColor">A</text><path d="M13 4l8 8M21 4l-8 8" stroke="#e11d48" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    </button>
                   </div>
-                  <div className="flex items-center gap-0.5 flex-wrap">
-                    <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bold') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="굵게"><strong>B</strong></button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('italic') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="기울임"><em>I</em></button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('underline') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="밑줄"><u>U</u></button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('strike') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="취소선"><s>S</s></button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleSubscript().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('subscript') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="아래 첨자">x₂</button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleSuperscript().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('superscript') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="위 첨자">x²</button>
-                    <label className="flex items-center cursor-pointer rounded hover:bg-blue-100 px-1 h-7" title="글자 색">
-                      <span className="text-xs text-red-600 font-bold">A</span>
-                      <input type="color" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} className="w-3 h-3 ml-0.5 cursor-pointer border-0" />
-                    </label>
-                    <label className="flex items-center cursor-pointer rounded hover:bg-blue-100 px-1 h-7" title="형광펜">
-                      <span className="text-xs">🖍</span>
-                      <input type="color" onInput={(e) => editor.chain().focus().toggleHighlight({ color: (e.target as HTMLInputElement).value }).run()} className="w-3 h-3 ml-0.5 cursor-pointer border-0" />
-                    </label>
+                  <div className="word-row">
+                    <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`word-btn-tog ${editor.isActive('bold') ? 'word-btn-active' : ''}`} title="굵게 (Ctrl+B)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="4" y="18" fontFamily="Arial" fontSize="16" fontWeight="900">B</text></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`word-btn-tog ${editor.isActive('italic') ? 'word-btn-active' : ''}`} title="기울임 (Ctrl+I)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="18" fontFamily="Times New Roman" fontSize="17" fontWeight="500" fontStyle="italic">I</text></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={`word-btn-tog ${editor.isActive('underline') ? 'word-btn-active' : ''}`} title="밑줄 (Ctrl+U)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="16" fontFamily="Arial" fontSize="14">U</text><line x1="4" y1="20" x2="18" y2="20" stroke="currentColor" strokeWidth="1.5"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={`word-btn-tog ${editor.isActive('strike') ? 'word-btn-active' : ''}`} title="취소선">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="4" y="18" fontFamily="Arial" fontSize="14">abc</text><line x1="3" y1="13" x2="20" y2="13" stroke="currentColor" strokeWidth="1.5"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleSubscript().run()} className={`word-btn-tog ${editor.isActive('subscript') ? 'word-btn-active' : ''}`} title="아래 첨자">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="16" fontFamily="Arial" fontSize="12">X</text><text x="13" y="22" fontFamily="Arial" fontSize="10">2</text></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleSuperscript().run()} className={`word-btn-tog ${editor.isActive('superscript') ? 'word-btn-active' : ''}`} title="위 첨자">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="20" fontFamily="Arial" fontSize="12">X</text><text x="13" y="10" fontFamily="Arial" fontSize="10">2</text></svg>
+                    </button>
+                    <div className="relative">
+                      <label className="word-btn-tog word-btn-color" title="글자 색">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="4" y="16" fontFamily="Arial" fontSize="14" fontWeight="700">A</text><rect x="4" y="18" width="14" height="3" fill="#e11d48"/></svg>
+                        <input type="color" onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} className="word-color-input" />
+                      </label>
+                    </div>
+                    <div className="relative">
+                      <label className="word-btn-tog word-btn-color" title="형광펜">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 15l5-10 6 4-5 10-6-4z" fill="#fef08a" stroke="currentColor" strokeWidth="1.1"/><path d="M7 15l-3 2 3 2 2-2" stroke="currentColor" strokeWidth="1.1"/><rect x="4" y="20" width="14" height="2" fill="#fef08a"/></svg>
+                        <input type="color" onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()} className="word-color-input" />
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div className="word-group-label">글꼴</div>
               </div>
 
-              {/* 단락 그룹 (Paragraph) */}
-              <div className="word-group flex flex-col items-center px-2">
-                <div className="flex flex-col gap-1 flex-1">
-                  <div className="flex items-center gap-0.5">
-                    <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="글머리 기호">•≡</button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('orderedList') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="번호 매기기">1.≡</button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={`w-7 h-7 text-sm rounded ${editor.isActive('blockquote') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="인용">❝</button>
-                    <button type="button" onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={`w-7 h-7 text-xs rounded ${editor.isActive('codeBlock') ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="코드 블록">{'<>'}</button>
+              {/* ========== 단락 그룹 ========== */}
+              <div className="word-group">
+                <div className="word-group-body word-paragraph-body">
+                  <div className="word-row">
+                    <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`word-btn-tog ${editor.isActive('bulletList') ? 'word-btn-active' : ''}`} title="글머리 기호">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="7" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="5" cy="17" r="1.5"/><line x1="10" y1="7" x2="20" y2="7" stroke="currentColor" strokeWidth="1.3"/><line x1="10" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1.3"/><line x1="10" y1="17" x2="20" y2="17" stroke="currentColor" strokeWidth="1.3"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`word-btn-tog ${editor.isActive('orderedList') ? 'word-btn-active' : ''}`} title="번호 매기기">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><text x="1" y="9" fontSize="7" fontFamily="Arial" fontWeight="600">1.</text><text x="1" y="14" fontSize="7" fontFamily="Arial" fontWeight="600">2.</text><text x="1" y="19" fontSize="7" fontFamily="Arial" fontWeight="600">3.</text><line x1="10" y1="7" x2="20" y2="7" strokeWidth="1.3" stroke="currentColor"/><line x1="10" y1="12" x2="20" y2="12" strokeWidth="1.3" stroke="currentColor"/><line x1="10" y1="17" x2="20" y2="17" strokeWidth="1.3" stroke="currentColor"/></svg>
+                    </button>
+                    <button type="button" onClick={() => setShowMultilevelMenu(!showMultilevelMenu)} className="word-btn-tog" title="다단계 목록">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><text x="1" y="9" fontSize="6" fontFamily="Arial">1</text><line x1="6" y1="7" x2="19" y2="7" strokeWidth="1.3" stroke="currentColor"/><text x="4" y="14" fontSize="6" fontFamily="Arial">a</text><line x1="9" y1="12" x2="19" y2="12" strokeWidth="1.3" stroke="currentColor"/><text x="7" y="19" fontSize="6" fontFamily="Arial">i</text><line x1="12" y1="17" x2="19" y2="17" strokeWidth="1.3" stroke="currentColor"/></svg>
+                    </button>
+                    <button type="button" onClick={() => (editor.chain().focus() as any).outdent().run()} className="word-btn-tog" title="내어쓰기">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><line x1="3" y1="6" x2="21" y2="6"/><line x1="10" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M7 10l-3 2 3 2"/></svg>
+                    </button>
+                    <button type="button" onClick={() => (editor.chain().focus() as any).indent().run()} className="word-btn-tog" title="들여쓰기">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><line x1="3" y1="6" x2="21" y2="6"/><line x1="10" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M5 10l3 2-3 2"/></svg>
+                    </button>
                   </div>
-                  <div className="flex items-center gap-0.5">
-                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="왼쪽 정렬">⫷</button>
-                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="가운데 정렬">≡</button>
-                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="오른쪽 정렬">⫸</button>
-                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`w-7 h-7 text-sm rounded ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`} title="양쪽 정렬">☰</button>
-                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus() as any).outdent().run()} className="w-7 h-7 text-sm hover:bg-blue-100 rounded" title="내어쓰기">⇤</button>
-                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus() as any).indent().run()} className="w-7 h-7 text-sm hover:bg-blue-100 rounded" title="들여쓰기">⇥</button>
+                  <div className="word-row">
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} className={`word-btn-tog ${editor.isActive({ textAlign: 'left' }) ? 'word-btn-active' : ''}`} title="왼쪽 맞춤">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><line x1="4" y1="14" x2="18" y2="14"/><line x1="4" y1="18" x2="12" y2="18"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} className={`word-btn-tog ${editor.isActive({ textAlign: 'center' }) ? 'word-btn-active' : ''}`} title="가운데 맞춤">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="6" y1="10" x2="18" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="7" y1="18" x2="17" y2="18"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} className={`word-btn-tog ${editor.isActive({ textAlign: 'right' }) ? 'word-btn-active' : ''}`} title="오른쪽 맞춤">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="10" x2="20" y2="10"/><line x1="6" y1="14" x2="20" y2="14"/><line x1="12" y1="18" x2="20" y2="18"/></svg>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={`word-btn-tog ${editor.isActive({ textAlign: 'justify' }) ? 'word-btn-active' : ''}`} title="양쪽 맞춤">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                    </button>
                     <div className="relative">
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowLineSpacingMenu(!showLineSpacingMenu); setShowCaseMenu(false) }} className="w-8 h-7 text-xs hover:bg-blue-100 rounded" title="줄 간격">↕≡</button>
+                      <button type="button" onClick={() => { setShowLineSpacingMenu(!showLineSpacingMenu); setShowCaseMenu(false) }} className="word-btn-tog word-btn-chevron" title="줄 간격">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M6 5v14M4 7l2-2 2 2M4 17l2 2 2-2"/><line x1="12" y1="7" x2="20" y2="7"/><line x1="12" y1="12" x2="20" y2="12"/><line x1="12" y1="17" x2="20" y2="17"/></svg>
+                        <span className="word-chevron">▾</span>
+                      </button>
                       {showLineSpacingMenu && (
-                        <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 shadow-lg rounded mt-1 w-32 py-1 text-xs">
+                        <div className="absolute top-full left-0 z-30 bg-white border border-[#c8c6c4] shadow-[0_4px_12px_rgba(0,0,0,0.15)] mt-0.5 w-32 py-1 text-xs">
                           {['1.0','1.15','1.5','2.0','2.5','3.0'].map(v => (
-                            <button key={v} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { (editor.chain().focus() as any).setLineHeight(v).run(); setShowLineSpacingMenu(false) }} className="w-full text-left px-3 py-1.5 hover:bg-blue-50">{v}</button>
+                            <button key={v} type="button" onClick={() => { (editor.chain().focus() as any).setLineHeight(v).run(); setShowLineSpacingMenu(false) }} className="word-menu-item">{v}</button>
                           ))}
-                          <div className="border-t border-gray-200 my-1"></div>
-                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { (editor.chain().focus() as any).unsetLineHeight().run(); setShowLineSpacingMenu(false) }} className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-gray-600">기본값</button>
                         </div>
                       )}
                     </div>
@@ -1870,65 +1934,63 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                 <div className="word-group-label">단락</div>
               </div>
 
-              {/* 다단계 목록 그룹 */}
-              <div className="word-group flex flex-col items-center px-2 relative">
-                <div className="flex gap-1 flex-1 items-start">
-                  <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editor.isActive('bulletList') ? 'bg-blue-200' : ''}`} title="글머리 기호">
-                    <span className="text-lg leading-none">•≡</span>
-                    <span className="text-[10px] mt-0.5">글머리</span>
+              {/* ========== 스타일 그룹 (갤러리) ========== */}
+              <div className="word-group">
+                <div className="word-group-body word-styles-body">
+                  <button type="button" onClick={() => applyStyle('normal')} className="word-style-card" title="표준"><span style={{ fontSize: 11 }}>표준</span></button>
+                  <button type="button" onClick={() => applyStyle('h1')} className="word-style-card" title="제목 1"><span style={{ fontSize: 14, fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                  <button type="button" onClick={() => applyStyle('h2')} className="word-style-card" title="제목 2"><span style={{ fontSize: 12, fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                  <button type="button" onClick={() => applyStyle('title')} className="word-style-card" title="제목"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                  <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card" title="부제"><span style={{ fontSize: 11, fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                  <button type="button" onClick={() => applyStyle('quote')} className="word-style-card" title="인용"><span style={{ fontSize: 11, fontStyle: 'italic' }}>"인용"</span></button>
+                  <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="word-style-more" title="더 보기">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 3l4 4 4-4z"/></svg>
                   </button>
-                  <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={`flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded ${editor.isActive('orderedList') ? 'bg-blue-200' : ''}`} title="번호 매기기">
-                    <span className="text-lg leading-none">1≡</span>
-                    <span className="text-[10px] mt-0.5">번호</span>
-                  </button>
-                  <button type="button" onClick={() => setShowMultilevelMenu(!showMultilevelMenu)} className="flex flex-col items-center px-2 py-1 hover:bg-blue-100 rounded" title="다단계 목록">
-                    <span className="text-lg leading-none">≡▾</span>
-                    <span className="text-[10px] mt-0.5">다단계</span>
-                  </button>
-                </div>
-                <div className="word-group-label">목록</div>
-                {showMultilevelMenu && (
-                  <div className="absolute top-full left-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-2 w-[240px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2 px-1">다단계 목록 스타일</div>
-                    <button type="button" onClick={() => applyMultilevel('decimal')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">1. 2. 3. (숫자)</button>
-                    <button type="button" onClick={() => applyMultilevel('alpha')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">a. b. c. (영문 소문자)</button>
-                    <button type="button" onClick={() => applyMultilevel('roman')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">i. ii. iii. (로마자)</button>
-                    <button type="button" onClick={() => applyMultilevel('bullet')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">• 글머리 기호</button>
-                    <button type="button" onClick={() => applyMultilevel('ordered')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-100 rounded">번호 매기기 (기본)</button>
-                  </div>
-                )}
-              </div>
-
-              {/* 스타일 그룹 (Heading + Gallery) */}
-              <div className="flex flex-col items-center px-2 relative">
-                <div className="flex gap-1 flex-1 items-center">
-                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 1 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 1</button>
-                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 2</button>
-                  <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`px-2 py-1 text-sm rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-200' : 'hover:bg-blue-100'}`}>제목 3</button>
-                  <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="px-1.5 py-1 text-sm rounded hover:bg-blue-100" title="스타일 갤러리">▾</button>
                 </div>
                 <div className="word-group-label">스타일</div>
                 {showStylesGallery && (
-                  <div className="absolute top-full right-0 z-30 bg-white border border-gray-300 rounded shadow-lg p-3 w-[420px]">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">스타일 갤러리</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button type="button" onClick={() => applyStyle('normal')} className="px-2 py-2 text-xs border border-gray-200 rounded hover:bg-blue-50 text-left">본문</button>
-                      <button type="button" onClick={() => applyStyle('title')} className="px-2 py-2 text-xl font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">큰 제목</button>
-                      <button type="button" onClick={() => applyStyle('subtitle')} className="px-2 py-2 text-base italic text-gray-500 border border-gray-200 rounded hover:bg-blue-50 text-left">부제목</button>
-                      <button type="button" onClick={() => applyStyle('h1')} className="px-2 py-2 text-lg font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 1</button>
-                      <button type="button" onClick={() => applyStyle('h2')} className="px-2 py-2 text-base font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 2</button>
-                      <button type="button" onClick={() => applyStyle('h3')} className="px-2 py-2 text-sm font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 3</button>
-                      <button type="button" onClick={() => applyStyle('h4')} className="px-2 py-2 text-xs font-semibold border border-gray-200 rounded hover:bg-blue-50 text-left">제목 4</button>
-                      <button type="button" onClick={() => applyStyle('strong')} className="px-2 py-2 text-xs font-bold border border-gray-200 rounded hover:bg-blue-50 text-left">강조</button>
-                      <button type="button" onClick={() => applyStyle('emphasis')} className="px-2 py-2 text-xs italic border border-gray-200 rounded hover:bg-blue-50 text-left">기울임</button>
-                      <button type="button" onClick={() => applyStyle('quote')} className="px-2 py-2 text-xs italic text-gray-600 border border-gray-200 rounded hover:bg-blue-50 text-left">인용</button>
-                      <button type="button" onClick={() => applyStyle('code')} className="px-2 py-2 text-xs font-mono bg-gray-50 border border-gray-200 rounded hover:bg-blue-50 text-left">코드</button>
+                  <div className="absolute top-full right-0 z-30 bg-white border border-[#c8c6c4] shadow-[0_4px_12px_rgba(0,0,0,0.18)] p-3 w-[480px] mt-0.5">
+                    <div className="text-xs font-semibold text-[#323130] mb-2">스타일 갤러리</div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <button type="button" onClick={() => applyStyle('normal')} className="word-style-card-lg"><span>표준</span></button>
+                      <button type="button" onClick={() => applyStyle('title')} className="word-style-card-lg"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                      <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card-lg"><span style={{ fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                      <button type="button" onClick={() => applyStyle('h1')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                      <button type="button" onClick={() => applyStyle('h2')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                      <button type="button" onClick={() => applyStyle('h3')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 3</span></button>
+                      <button type="button" onClick={() => applyStyle('h4')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 4</span></button>
+                      <button type="button" onClick={() => applyStyle('strong')} className="word-style-card-lg"><span style={{ fontWeight: 700 }}>강조</span></button>
+                      <button type="button" onClick={() => applyStyle('emphasis')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>기울임</span></button>
+                      <button type="button" onClick={() => applyStyle('quote')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>인용</span></button>
+                      <button type="button" onClick={() => applyStyle('code')} className="word-style-card-lg"><span style={{ fontFamily: 'monospace' }}>코드</span></button>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* ========== 편집 그룹 ========== */}
+              <div className="word-group">
+                <div className="word-group-body">
+                  <div className="word-group-col" style={{ gap: 2 }}>
+                    <button type="button" onClick={() => setShowFindReplace(!showFindReplace)} className="word-btn-small" title="찾기 (Ctrl+F)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="6"/><line x1="16" y1="16" x2="21" y2="21"/></svg>
+                      <span>찾기</span>
+                    </button>
+                    <button type="button" onClick={() => { setShowFindReplace(true); setTimeout(() => { const el = document.getElementById('fr-replace') as HTMLInputElement | null; el?.focus() }, 50) }} className="word-btn-small" title="바꾸기 (Ctrl+H)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 7h10M4 7l4-3M4 7l4 3"/><path d="M20 17H10M20 17l-4-3M20 17l-4 3"/></svg>
+                      <span>바꾸기</span>
+                    </button>
+                    <button type="button" onClick={() => editor.chain().focus().selectAll().run()} className="word-btn-small" title="모두 선택 (Ctrl+A)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5" strokeWidth="1.1"/></svg>
+                      <span>선택</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="word-group-label">편집</div>
+              </div>
             </div>
           )}
+
 
           {/* ========== 삽입 탭 ========== */}
           {activeTab === 'insert' && (
@@ -2687,7 +2749,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       )}
 
       {/* 에디터 (A4 페이지 레이아웃 + 줌 + 페이지 구분) */}
-      <div className={isFullscreen ? 'h-[calc(100vh-240px)] overflow-auto editor-canvas' : 'editor-canvas'}>
+      <div className={isFullscreen ? 'editor-canvas editor-canvas-fullscreen' : 'editor-canvas editor-canvas-normal'}>
         <div
           className="editor-zoom-wrapper"
           style={{
@@ -2914,6 +2976,219 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           background-color: #c7e0f4 !important;
           box-shadow: inset 0 0 0 1px #0078d4;
           border-radius: 2px;
+        }
+
+        /* === 리본 탭 (Home/Insert/Layout) 공통 === */
+        .word-ribbon-tab {
+          display: flex;
+          align-items: stretch;
+          gap: 0;
+          min-height: 94px;
+          padding: 0 6px;
+        }
+
+        /* === 리본 그룹 === */
+        .word-group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 3px 8px 2px 8px;
+          border-right: 1px solid #e1dfdd;
+          position: relative;
+        }
+        .word-group:last-child { border-right: none; }
+        .word-group-body {
+          display: flex;
+          align-items: flex-start;
+          gap: 2px;
+          flex: 1;
+          padding-bottom: 2px;
+        }
+        .word-group-col {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+        .word-row {
+          display: flex;
+          align-items: center;
+          gap: 1px;
+        }
+        .word-font-body, .word-paragraph-body {
+          flex-direction: column;
+          gap: 3px;
+        }
+        .word-styles-body {
+          display: flex;
+          gap: 2px;
+          align-items: center;
+        }
+        .word-group-label {
+          font-size: 11px;
+          color: #605e5c;
+          padding-top: 4px;
+          text-align: center;
+          width: 100%;
+          font-weight: 400;
+          border-top: 1px solid #f3f2f1;
+          margin-top: 2px;
+        }
+
+        /* === 버튼 종류 === */
+        .word-icon-24 { width: 24px; height: 24px; }
+        .word-btn-large {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 6px 2px 6px;
+          min-width: 52px;
+          min-height: 62px;
+          border-radius: 2px;
+          background: transparent;
+          color: #323130;
+          transition: background 0.08s;
+          position: relative;
+        }
+        .word-btn-large:hover:not(:disabled) { background: #e7e6e5; }
+        .word-btn-label {
+          font-size: 11px;
+          margin-top: 2px;
+          line-height: 1.1;
+        }
+        .word-btn-small {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 6px;
+          border-radius: 2px;
+          background: transparent;
+          color: #323130;
+          font-size: 11px;
+          min-height: 20px;
+          transition: background 0.08s;
+        }
+        .word-btn-small:hover:not(:disabled) { background: #e7e6e5; }
+        .word-btn-small span { white-space: nowrap; }
+        .word-btn-tog {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 2px;
+          background: transparent;
+          color: #323130;
+          transition: background 0.08s;
+        }
+        .word-btn-tog:hover:not(:disabled) { background: #e7e6e5; }
+        .word-btn-active {
+          background: #c7e0f4 !important;
+          box-shadow: inset 0 0 0 1px #0078d4;
+        }
+        .word-btn-mini {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 2px;
+          background: transparent;
+          color: #323130;
+          transition: background 0.08s;
+        }
+        .word-btn-mini:hover { background: #e7e6e5; }
+        .word-btn-chevron { width: 30px; }
+        .word-chevron { font-size: 8px; margin-left: 2px; color: #605e5c; }
+        .word-btn-color { width: 22px; height: 22px; position: relative; cursor: pointer; overflow: hidden; }
+        .word-color-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+        /* === 폰트/크기 셀렉트 === */
+        .word-font-select {
+          background: #ffffff;
+          border: 1px solid #8a8886;
+          border-radius: 2px;
+          font-size: 11px;
+          padding: 2px 22px 2px 6px;
+          height: 22px;
+          width: 160px;
+          color: #323130;
+        }
+        .word-size-select {
+          background: #ffffff;
+          border: 1px solid #8a8886;
+          border-radius: 2px;
+          font-size: 11px;
+          padding: 2px 18px 2px 6px;
+          height: 22px;
+          width: 52px;
+          color: #323130;
+        }
+
+        /* === 스타일 갤러리 카드 === */
+        .word-style-card {
+          min-width: 60px;
+          max-width: 72px;
+          height: 52px;
+          padding: 4px 8px;
+          border: 1px solid #edebe9;
+          background: #ffffff;
+          border-radius: 1px;
+          color: #323130;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: border-color 0.08s, background 0.08s;
+          white-space: nowrap;
+          overflow: hidden;
+        }
+        .word-style-card:hover { border-color: #2b579a; background: #f3f7fd; }
+        .word-style-card-lg {
+          min-width: 100px;
+          height: 60px;
+          padding: 6px 10px;
+          border: 1px solid #edebe9;
+          background: #ffffff;
+          border-radius: 1px;
+          color: #323130;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: border-color 0.08s;
+        }
+        .word-style-card-lg:hover { border-color: #2b579a; background: #f3f7fd; }
+        .word-style-more {
+          width: 14px;
+          height: 52px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #605e5c;
+          border-left: 1px solid #edebe9;
+          background: transparent;
+        }
+        .word-style-more:hover { background: #e7e6e5; }
+
+        /* === 드롭다운 메뉴 아이템 === */
+        .word-menu-item {
+          display: block;
+          width: 100%;
+          text-align: left;
+          padding: 6px 14px;
+          font-size: 12px;
+          color: #323130;
+          background: transparent;
+          transition: background 0.08s;
+        }
+        .word-menu-item:hover { background: #e7e6e5; }
+
+        /* === 캔버스 오버플로우 수정 === */
+        .editor-canvas-normal {
+          max-height: calc(100vh - 260px);
+          min-height: 500px;
+        }
+        .editor-canvas-fullscreen {
+          height: calc(100vh - 240px);
         }
 
         /* === 하단 상태바 (Word 블루) === */
