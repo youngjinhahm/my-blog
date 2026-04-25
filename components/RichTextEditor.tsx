@@ -2806,27 +2806,28 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       </div>
 
       {/* === Word 스타일 하단 상태바 (Status Bar) === */}
-      <div className="word-statusbar flex items-center gap-3 px-4 py-1 text-[11px] border-t">
-        <div className="flex items-center gap-1">
-          <span className="font-semibold">📄 페이지</span>
-          <span className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-gray-800 font-medium tabular-nums">{currentPage} / {totalPages}</span>
+      <div className="word-statusbar">
+        <div className="word-statusbar-left">
+          <button type="button" className="word-statusbar-item" title="페이지">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 1.5h6.5L13 5v9.5H3z" stroke="#fff" strokeWidth="1.2" fill="none"/><path d="M9 1.5V5h4" stroke="#fff" strokeWidth="1.2" fill="none"/></svg>
+            <span>페이지 {currentPage}/{totalPages}</span>
+          </button>
+          <div className="word-statusbar-sep"></div>
+          <button type="button" className="word-statusbar-item" title="단어 수">
+            단어: <b>{wordCount.toLocaleString()}</b>
+          </button>
+          <div className="word-statusbar-sep"></div>
+          <button type="button" className="word-statusbar-item" title="글자 수">
+            글자: <b>{charCount.toLocaleString()}</b>
+          </button>
         </div>
-        <div className="word-statusbar-sep"></div>
-        <div className="flex items-center gap-1">
-          <span>단어: <b className="tabular-nums">{wordCount.toLocaleString()}</b></span>
-        </div>
-        <div className="word-statusbar-sep"></div>
-        <div className="flex items-center gap-1">
-          <span>글자: <b className="tabular-nums">{charCount.toLocaleString()}</b></span>
-        </div>
-        <div className="flex-1"></div>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">💡 Ctrl+Z/B/I/U, Ctrl+K 링크</span>
-        </div>
-        <div className="word-statusbar-sep"></div>
-        {/* Zoom 컨트롤 */}
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setZoomLevel(Math.max(25, zoomLevel - 10))} className="w-6 h-5 flex items-center justify-center hover:bg-blue-200 rounded text-sm font-bold" title="축소">−</button>
+
+        <div className="word-statusbar-right">
+          {/* Zoom controls — Word-exact */}
+          <button type="button" onClick={() => setZoomLevel(100)} className="word-zoom-percent" title="100%로 복원">{zoomLevel}%</button>
+          <button type="button" onClick={() => setZoomLevel(Math.max(25, zoomLevel - 10))} disabled={zoomLevel <= 25} className="word-zoom-btn" title="축소 (Ctrl+-)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          </button>
           <input
             type="range"
             min="25"
@@ -2834,11 +2835,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
             step="5"
             value={zoomLevel}
             onChange={(e) => setZoomLevel(Number(e.target.value))}
-            className="w-32 h-1 accent-blue-600"
+            className="word-zoom-slider"
             title="확대/축소"
           />
-          <button type="button" onClick={() => setZoomLevel(Math.min(300, zoomLevel + 10))} className="w-6 h-5 flex items-center justify-center hover:bg-blue-200 rounded text-sm font-bold" title="확대">+</button>
-          <button type="button" onClick={() => setZoomLevel(100)} className="min-w-[48px] px-2 h-5 text-[11px] hover:bg-blue-200 rounded tabular-nums font-semibold text-gray-800" title="100%로 복원">{zoomLevel}%</button>
+          <button type="button" onClick={() => setZoomLevel(Math.min(300, zoomLevel + 10))} disabled={zoomLevel >= 300} className="word-zoom-btn" title="확대 (Ctrl++)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          </button>
         </div>
       </div>
 
@@ -3211,28 +3213,105 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* === 하단 상태바 (Word 블루) === */
         .word-statusbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           background: #2b579a;
           color: #ffffff;
-          border-color: #1e4178;
+          height: 28px;
+          padding: 0 4px;
+          border-top: 1px solid #1e4178;
+          font-size: 12px;
+          position: relative;
+          z-index: 100;
+          flex-shrink: 0;
         }
-        .word-statusbar b { color: #ffffff; font-weight: 600; }
-        .word-statusbar-sep {
-          width: 1px; height: 14px;
-          background: rgba(255,255,255,0.3);
+        .word-statusbar-left,
+        .word-statusbar-right {
+          display: flex;
+          align-items: center;
+          height: 100%;
+          gap: 0;
         }
-        .word-statusbar button {
+        .word-statusbar-item {
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0 10px;
           color: #ffffff;
+          background: transparent;
+          border: none;
+          font-size: 12px;
+          cursor: default;
         }
-        .word-statusbar button:hover {
-          background: rgba(255,255,255,0.18) !important;
+        .word-statusbar-item:hover { background: rgba(255,255,255,0.12); }
+        .word-statusbar-item b { color: #ffffff; font-weight: 600; }
+        .word-statusbar-sep {
+          width: 1px; height: 16px;
+          background: rgba(255,255,255,0.25);
+          margin: 0 1px;
         }
-        .word-statusbar span.bg-white,
-        .word-statusbar .bg-white {
-          background: rgba(255,255,255,0.18) !important;
-          color: #ffffff !important;
-          border-color: rgba(255,255,255,0.35) !important;
+        .word-zoom-btn {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          background: transparent;
+          border: none;
+          cursor: pointer;
         }
-        .word-statusbar input[type="range"] { accent-color: #ffffff; }
+        .word-zoom-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+        .word-zoom-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .word-zoom-percent {
+          min-width: 48px;
+          height: 28px;
+          padding: 0 10px;
+          color: #ffffff;
+          background: transparent;
+          border: none;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .word-zoom-percent:hover { background: rgba(255,255,255,0.18); }
+        .word-zoom-slider {
+          width: 110px;
+          height: 4px;
+          accent-color: #ffffff;
+          margin: 0 2px;
+        }
+        .word-zoom-slider::-webkit-slider-runnable-track {
+          height: 4px;
+          background: rgba(255,255,255,0.45);
+          border-radius: 2px;
+        }
+        .word-zoom-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          margin-top: -5px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 1px solid rgba(0,0,0,0.15);
+          cursor: pointer;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+        }
+        .word-zoom-slider::-moz-range-track {
+          height: 4px;
+          background: rgba(255,255,255,0.45);
+          border-radius: 2px;
+        }
+        .word-zoom-slider::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 1px solid rgba(0,0,0,0.15);
+          cursor: pointer;
+        }
 
         /* === 인풋/셀렉트 스타일 === */
         .word-ribbon-body select,
