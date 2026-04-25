@@ -10,6 +10,7 @@ async function getPosts() {
     .from('posts')
     .select('*')
     .eq('published', true)
+      .eq('is_private', false)
     .order('created_at', { ascending: false })
     .limit(3)
 

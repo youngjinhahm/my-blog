@@ -17,6 +17,12 @@ async function getPost(slug: string) {
     return null
   }
 
+  // 비밀글 또는 미발행 글은 외부에서 조회 불가
+  // (관리자는 /admin 페이지에서 직접 편집 가능; 별도 미리보기 라우트는 만들지 않음)
+  if ((data as any).is_private || !data.published) {
+    return null
+  }
+
   // 조회수 증가
   await supabase
     .from('posts')

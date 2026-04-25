@@ -45,6 +45,7 @@ export default function CategoryPage({
       .from('posts')
       .select('*')
       .eq('published', true)
+      .eq('is_private', false)
       .eq('category', cat)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -54,6 +55,7 @@ export default function CategoryPage({
       .from('posts')
       .select('*')
       .eq('published', true)
+      .eq('is_private', false)
       .eq('category', cat)
       .order('views', { ascending: false })
       .limit(3)
@@ -63,6 +65,7 @@ export default function CategoryPage({
       .from('posts')
       .select('*')
       .eq('published', true)
+      .eq('is_private', false)
       .eq('category', cat)
       .order('created_at', { ascending: false })
     

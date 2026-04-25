@@ -7,6 +7,7 @@ export interface Post {
   content: string
   excerpt: string | null
   published: boolean
+  is_private: boolean  // 비밀글: true면 외부 조회 불가, 관리자만 볼 수 있음
   author_id: string | null
   category: string
   views: number  // 이 줄 추가

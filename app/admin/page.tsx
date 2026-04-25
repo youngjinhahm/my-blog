@@ -21,6 +21,7 @@ export default function AdminPage() {
     content: '',
     excerpt: '',
     published: false,
+    is_private: false,
     category: '경제' as string
   })
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
@@ -34,6 +35,7 @@ export default function AdminPage() {
     content: string
     excerpt: string
     published: boolean
+    is_private: boolean
     category: string
     savedAt: string
     editingPostId?: string | null
@@ -89,6 +91,7 @@ export default function AdminPage() {
           content: parsed.content || '',
           excerpt: parsed.excerpt || '',
           published: !!parsed.published,
+          is_private: !!parsed.is_private,
           category: parsed.category || '경제',
           savedAt: parsed.savedAt || new Date().toISOString(),
           editingPostId: null,
@@ -117,6 +120,7 @@ export default function AdminPage() {
         content: formData.content,
         excerpt: formData.excerpt,
         published: formData.published,
+        is_private: formData.is_private,
         category: formData.category,
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
@@ -228,6 +232,7 @@ export default function AdminPage() {
       content: '',
       excerpt: '',
       published: false,
+      is_private: false,
       category: '경제'
     })
     setShowForm(true)
@@ -243,6 +248,7 @@ export default function AdminPage() {
       content: d.content || '',
       excerpt: d.excerpt || '',
       published: !!d.published,
+      is_private: !!d.is_private,
       category: d.category || '경제',
     })
     setShowDraftList(false)
@@ -291,6 +297,7 @@ export default function AdminPage() {
               content: draft.content || post.content,
               excerpt: draft.excerpt || post.excerpt || '',
               published: draft.published ?? post.published,
+              is_private: draft.is_private ?? (post as any).is_private ?? false,
               category: draft.category || post.category,
             })
             setShowForm(true)
@@ -307,6 +314,7 @@ export default function AdminPage() {
       content: post.content,
       excerpt: post.excerpt || '',
       published: post.published,
+      is_private: (post as any).is_private || false,
       category: post.category
     })
     setShowForm(true)
@@ -324,6 +332,7 @@ export default function AdminPage() {
         content: formData.content,
         excerpt: formData.excerpt,
         published: formData.published,
+        is_private: formData.is_private,
         category: formData.category,
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
@@ -378,6 +387,7 @@ export default function AdminPage() {
           content: formData.content,
           excerpt: formData.excerpt || null,
           published: formData.published,
+          is_private: formData.is_private,
           category: formData.category,
           updated_at: new Date().toISOString()
         })
@@ -400,6 +410,7 @@ export default function AdminPage() {
           content: formData.content,
           excerpt: formData.excerpt || null,
           published: formData.published,
+          is_private: formData.is_private,
           category: formData.category,
           author_id: user.id
         }])
@@ -548,17 +559,31 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="published"
-                  checked={formData.published}
-                  onChange={(e) => setFormData({...formData, published: e.target.checked})}
-                  className="mr-2 w-4 h-4"
-                />
-                <label htmlFor="published" className="text-sm font-medium text-gray-700">
-                  발행하기
-                </label>
+              <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="published"
+                    checked={formData.published}
+                    onChange={(e) => setFormData({...formData, published: e.target.checked})}
+                    className="mr-2 w-4 h-4"
+                  />
+                  <label htmlFor="published" className="text-sm font-medium text-gray-700">
+                    발행하기
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_private"
+                    checked={formData.is_private}
+                    onChange={(e) => setFormData({...formData, is_private: e.target.checked})}
+                    className="mr-2 w-4 h-4 accent-amber-600"
+                  />
+                  <label htmlFor="is_private" className="text-sm font-medium text-gray-700">
+                    🔒 비밀글 (관리자만 볼 수 있음)
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-4 flex-wrap items-center">
@@ -691,13 +716,20 @@ export default function AdminPage() {
                       <span className="text-sm text-gray-600">{post.category}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        post.published 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {post.published ? '발행됨' : '초안'}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          post.published 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {post.published ? '발행됨' : '초안'}
+                        </span>
+                        {(post as any).is_private && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                            🔒 비밀글
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {new Date(post.created_at).toLocaleDateString('ko-KR')}
