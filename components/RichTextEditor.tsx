@@ -515,11 +515,24 @@ const ResizableImage = Image.extend({
       width: {
         default: null,
       },
+      align: {
+        default: 'left',
+        renderHTML: (attrs: any) => attrs.align ? { 'data-align': attrs.align } : {},
+        parseHTML: (el: any) => el.getAttribute('data-align') || 'left',
+      },
     }
   },
 
   addNodeView() {
     return ({ node, getPos, editor }) => {
+      // Outer wrapper: a block-level container that handles alignment via text-align
+      const wrap = document.createElement('div')
+      wrap.className = 'image-block'
+      wrap.setAttribute('data-align', node.attrs.align || 'left')
+      wrap.style.width = '100%'
+      wrap.style.textAlign = node.attrs.align === 'center' ? 'center' : node.attrs.align === 'right' ? 'right' : 'left'
+      wrap.style.margin = '0.5em 0'
+
       const container = document.createElement('div')
       container.className = 'image-resizer'
       container.style.position = 'relative'
@@ -551,6 +564,7 @@ const ResizableImage = Image.extend({
 
       container.appendChild(img)
       container.appendChild(handle)
+      wrap.appendChild(container)
 
       let isResizing = false
       let startX = 0
@@ -591,7 +605,16 @@ const ResizableImage = Image.extend({
       })
 
       return {
-        dom: container,
+        dom: wrap,
+        update: (updatedNode: any) => {
+          if (updatedNode.type.name !== node.type.name) return false
+          const newAlign = updatedNode.attrs.align || 'left'
+          wrap.setAttribute('data-align', newAlign)
+          wrap.style.textAlign = newAlign === 'center' ? 'center' : newAlign === 'right' ? 'right' : 'left'
+          if (updatedNode.attrs.width) img.style.width = updatedNode.attrs.width + 'px'
+          if (updatedNode.attrs.src && img.src !== updatedNode.attrs.src) img.src = updatedNode.attrs.src
+          return true
+        },
       }
     }
   },
@@ -934,12 +957,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     if (!node) return
     const editorWidth = editor.view.dom.clientWidth
     const newWidth = Math.round(editorWidth * widthPercent / 100)
-    editor.chain().focus().updateAttributes('resizableImage', { width: newWidth }).run()
+    editor.chain().focus().updateAttributes('image', { width: newWidth }).run()
   }
 
   const setImageAlign = (align: string) => {
     if (!editor) return
-    editor.chain().focus().updateAttributes('resizableImage', { align }).run()
+    editor.chain().focus().updateAttributes('image', { align }).run()
   }
 
   const handleReplaceImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -947,7 +970,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     if (!file || !editor) return
     const url = await uploadImageAndGetUrl(file)
     if (url) {
-      editor.chain().focus().updateAttributes('resizableImage', { src: url }).run()
+      editor.chain().focus().updateAttributes('image', { src: url }).run()
     }
     e.target.value = ''
   }
@@ -2783,18 +2806,24 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           {/* 이미지 선택 시 플로팅 툴바 */}
           {showImageToolbar && isImageSelected && (
             <div
-              className="absolute z-30 flex items-center gap-1 bg-white border border-gray-300 rounded-lg shadow-lg px-2 py-1"
+              className="absolute z-30 flex items-center gap-1 bg-white border border-gray-300 rounded-lg shadow-lg px-2 py-1.5"
               style={{ top: `${imageToolbarPos.top}px`, left: `${imageToolbarPos.left}px`, transform: 'translateX(-50%)' }}
               onMouseDown={(e) => e.preventDefault()}
             >
-              <button type="button" onClick={() => setImageSize(25)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="25%">25%</button>
-              <button type="button" onClick={() => setImageSize(50)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="50%">50%</button>
-              <button type="button" onClick={() => setImageSize(75)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="75%">75%</button>
-              <button type="button" onClick={() => setImageSize(100)} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="100%">100%</button>
-              <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
-              <button type="button" onClick={() => setImageAlign('left')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="왼쪽 정렬">⫷</button>
-              <button type="button" onClick={() => setImageAlign('center')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="가운데">≡</button>
-              <button type="button" onClick={() => setImageAlign('right')} className="px-1.5 py-0.5 text-xs hover:bg-blue-100 rounded" title="오른쪽 정렬">⫸</button>
+              <button type="button" onClick={() => setImageSize(25)} className="px-2 py-1 text-[11px] hover:bg-blue-50 rounded text-gray-700" title="25%">25%</button>
+              <button type="button" onClick={() => setImageSize(50)} className="px-2 py-1 text-[11px] hover:bg-blue-50 rounded text-gray-700" title="50%">50%</button>
+              <button type="button" onClick={() => setImageSize(75)} className="px-2 py-1 text-[11px] hover:bg-blue-50 rounded text-gray-700" title="75%">75%</button>
+              <button type="button" onClick={() => setImageSize(100)} className="px-2 py-1 text-[11px] hover:bg-blue-50 rounded text-gray-700" title="100%">100%</button>
+              <div className="w-px h-5 bg-gray-200 mx-1"></div>
+              <button type="button" onClick={() => setImageAlign('left')} className="p-1 hover:bg-blue-50 rounded" title="왼쪽 정렬">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="9" height="6" rx="0.5" stroke="#2b579a" strokeWidth="1.4" fill="#c7e0f4"/><line x1="2" y1="12" x2="16" y2="12" stroke="#605e5c" strokeWidth="1.2"/><line x1="2" y1="15" x2="13" y2="15" stroke="#605e5c" strokeWidth="1.2"/></svg>
+              </button>
+              <button type="button" onClick={() => setImageAlign('center')} className="p-1 hover:bg-blue-50 rounded" title="가운데 정렬">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="4.5" y="3" width="9" height="6" rx="0.5" stroke="#2b579a" strokeWidth="1.4" fill="#c7e0f4"/><line x1="3" y1="12" x2="15" y2="12" stroke="#605e5c" strokeWidth="1.2"/><line x1="4.5" y1="15" x2="13.5" y2="15" stroke="#605e5c" strokeWidth="1.2"/></svg>
+              </button>
+              <button type="button" onClick={() => setImageAlign('right')} className="p-1 hover:bg-blue-50 rounded" title="오른쪽 정렬">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="3" width="9" height="6" rx="0.5" stroke="#2b579a" strokeWidth="1.4" fill="#c7e0f4"/><line x1="2" y1="12" x2="16" y2="12" stroke="#605e5c" strokeWidth="1.2"/><line x1="5" y1="15" x2="16" y2="15" stroke="#605e5c" strokeWidth="1.2"/></svg>
+              </button>
               <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
               <button type="button" onClick={() => replaceImageRef.current?.click()} className="px-1.5 py-0.5 text-[10px] hover:bg-blue-100 rounded" title="이미지 교체">교체</button>
               <button type="button" onClick={deleteSelectedImage} className="px-1.5 py-0.5 text-[10px] hover:bg-red-100 text-red-600 rounded" title="삭제">삭제</button>
@@ -2863,14 +2892,25 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         }
 
         /* ============================================
-           MS Word 365 정확 재현 - 전체 셸
+           MS Word 365 정확 재현 - 전체 셸 (flex column app shell)
            ============================================ */
         .word-app {
+          display: flex;
+          flex-direction: column;
           background: #f3f2f1;
           font-family: 'Segoe UI', 'Malgun Gothic', '맑은 고딕', -apple-system, sans-serif;
           font-size: 12px;
           color: #242424;
+          /* In normal mode, take a generous viewport-relative height so the
+             status bar stays pinned to the bottom regardless of content length. */
+          height: calc(100vh - 80px);
+          min-height: 540px;
         }
+        .word-app.fixed { height: 100vh; min-height: 0; }
+        .word-titlebar,
+        .word-tabbar,
+        .word-ribbon-body { flex-shrink: 0; }
+        .word-statusbar { flex-shrink: 0; }
 
         /* === Title Bar (Word 블루) === */
         .word-titlebar {
@@ -3203,12 +3243,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* === 캔버스 오버플로우 수정 === */
         .editor-canvas-normal {
-          height: calc(100vh - 280px);
-          min-height: 480px;
-          max-height: calc(100vh - 280px);
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
         }
         .editor-canvas-fullscreen {
-          height: calc(100vh - 240px);
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
         }
 
         /* === 하단 상태바 (Word 블루) === */
@@ -3356,9 +3398,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         .editor-zoom-wrapper {
           margin: 0 auto;
-          width: 100%;
-          display: flex;
-          justify-content: center;
+          width: fit-content;
+          max-width: 100%;
         }
         .editor-page {
           box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -3385,6 +3426,36 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .ProseMirror .image-resizer {
           margin: 0;
           line-height: 0;
+        }
+
+        /* === Image alignment === */
+        .ProseMirror .image-block { width: 100%; }
+        .ProseMirror .image-block[data-align="center"] { text-align: center; }
+        .ProseMirror .image-block[data-align="right"] { text-align: right; }
+        .ProseMirror .image-block[data-align="left"] { text-align: left; }
+
+        /* === Print: keep images, headings, paragraphs together with following content === */
+        @media print {
+          .editor-canvas, .editor-canvas-normal, .editor-canvas-fullscreen {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+          }
+          .word-titlebar, .word-tabbar, .word-ribbon-body, .word-statusbar { display: none !important; }
+          .editor-page { box-shadow: none !important; border: none !important; margin: 0 !important; }
+          .ProseMirror img,
+          .ProseMirror .image-block,
+          .ProseMirror .image-resizer,
+          .ProseMirror table,
+          .ProseMirror figure,
+          .ProseMirror pre {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4 {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
         }
         .ProseMirror .image-resizer img {
           display: block;
