@@ -19,6 +19,7 @@ import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
 import { Mark, Node, Extension } from '@tiptap/core'
 import { CellSelection, TableMap } from '@tiptap/pm/tables'
+import { NodeSelection } from '@tiptap/pm/state'
 
 // Word의 Table Styles 대응: 표에 스타일 프리셋 class 부여
 const StyledTable = Table.extend({
@@ -539,6 +540,21 @@ const ResizableImage = Image.extend({
       container.style.display = 'inline-block'
       container.style.maxWidth = '100%'
       container.style.margin = '0'
+      container.style.cursor = 'pointer'
+      // Click selects the image node so isActive('image') is true and the toolbar appears
+      container.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (typeof getPos === 'function') {
+          const pos = getPos()
+          if (typeof pos === 'number') {
+            const { state, view } = editor
+            const tr = state.tr.setSelection(NodeSelection.create(state.doc, pos))
+            view.dispatch(tr)
+            view.focus()
+          }
+        }
+      })
 
       const img = document.createElement('img')
       img.src = node.attrs.src
@@ -926,27 +942,31 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }, [editor])
 
   // 이미지 선택 감지 → 플로팅 툴바 표시
-  const isImageSelected = editor?.isActive('resizableImage') ?? false
+  const isImageSelected = editor?.isActive('image') ?? false
   useEffect(() => {
     if (!editor || !isImageSelected) {
       setShowImageToolbar(false)
       return
     }
     // 선택된 이미지 DOM 위치 찾기
-    const { node } = editor.state.selection as any
-    if (!node) { setShowImageToolbar(false); return }
-    const dom = editor.view.nodeDOM(editor.state.selection.from) as HTMLElement
-    if (!dom) { setShowImageToolbar(false); return }
-    const img = dom.tagName === 'IMG' ? dom : dom.querySelector('img')
+    const dom = editor.view.nodeDOM(editor.state.selection.from) as HTMLElement | null
+    let img: HTMLImageElement | null = null
+    if (dom) {
+      img = (dom.tagName === 'IMG' ? dom : dom.querySelector('img')) as HTMLImageElement | null
+    }
+    if (!img) {
+      // Fallback: image node has nodeView wrap > container > img
+      const sel = document.querySelector('.ProseMirror .ProseMirror-selectednode img') as HTMLImageElement | null
+      img = sel || null
+    }
     if (!img) { setShowImageToolbar(false); return }
     const rect = img.getBoundingClientRect()
-    const editorRect = editor.view.dom.closest('.bg-white')?.getBoundingClientRect()
-    if (editorRect) {
-      setImageToolbarPos({
-        top: rect.top - editorRect.top - 44,
-        left: rect.left - editorRect.left + rect.width / 2,
-      })
-    }
+    const editorRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
+      || editor.view.dom.getBoundingClientRect()
+    setImageToolbarPos({
+      top: rect.top - editorRect.top - 44,
+      left: rect.left - editorRect.left + rect.width / 2,
+    })
     setShowImageToolbar(true)
   }, [isImageSelected, editor?.state.selection])
 

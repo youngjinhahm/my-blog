@@ -340,27 +340,6 @@ export default function AdminPage() {
     }
   }
 
-  // 새 임시저장 사본 만들기 — 현재 폼 내용을 새 ID로 복제
-  function handleSaveAsNewDraft() {
-    if (typeof window === 'undefined') return
-    const id = newDraftId()
-    const payload: DraftPayload = {
-      id,
-      title: formData.title || '제목 없음',
-      slug: formData.slug,
-      content: formData.content,
-      excerpt: formData.excerpt,
-      published: formData.published,
-      category: formData.category,
-      savedAt: new Date().toISOString(),
-      editingPostId: editingPost?.id || null,
-    }
-    const next = { ...loadDrafts(), [id]: payload }
-    persistDrafts(next)
-    setDrafts(next)
-    setHasStoredDraft(true)
-    alert('새 임시저장 사본을 만들었습니다.')
-  }
 
   function clearDraft() {
     if (typeof window === 'undefined') return
@@ -596,14 +575,6 @@ export default function AdminPage() {
                   title="임시 저장 (브라우저에 저장, 나중에 이어서 작성)"
                 >
                   💾 임시 저장
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAsNewDraft}
-                  className="bg-white text-amber-700 border border-amber-400 px-6 py-3 rounded-lg hover:bg-amber-50 transition font-medium"
-                  title="현재 내용을 별도 사본으로 임시 저장"
-                >
-                  📋 사본 저장
                 </button>
                 <button
                   type="button"
