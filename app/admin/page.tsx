@@ -26,40 +26,110 @@ export default function AdminPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
 
-  // 임시 저장 키: 새 글이면 draft:new, 편집 중이면 draft:<id>
+  // === 임시 저장글 시스템 (v2: 여러 개 저장 가능) ===
+  type DraftPayload = {
+    id: string
+    title: string
+    slug: string
+    content: string
+    excerpt: string
+    published: boolean
+    category: string
+    savedAt: string
+    editingPostId?: string | null
+  }
+  const DRAFTS_KEY = 'blog-drafts-v2'
+  const [drafts, setDrafts] = useState<Record<string, DraftPayload>>({})
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
+  const [showDraftList, setShowDraftList] = useState(false)
+
+  // 구버전 단일 임시저장 키 호환용 (기존 글 수정 페이지에 한정)
   const getDraftKey = () => `blog-draft:${editingPost?.id || 'new'}`
+
+  // 모든 임시저장글 로드
+  const loadDrafts = (): Record<string, DraftPayload> => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(DRAFTS_KEY)
+      if (!raw) return {}
+      return JSON.parse(raw) as Record<string, DraftPayload>
+    } catch {
+      return {}
+    }
+  }
+  const persistDrafts = (next: Record<string, DraftPayload>) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(DRAFTS_KEY, JSON.stringify(next))
+    } catch (e) {
+      console.warn('임시저장 저장 실패:', e)
+    }
+  }
+  const newDraftId = () =>
+    `d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
   useEffect(() => {
     checkUser()
   }, [])
 
-  // 페이지 로드 시 새 글 임시저장 여부 체크 (상단 배너용)
+  // 페이지 로드 시 임시저장글 목록 동기화 + 구버전 마이그레이션
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setHasStoredDraft(!!localStorage.getItem('blog-draft:new'))
+    const list = loadDrafts()
+    // 구버전 'blog-draft:new'을 v2 리스트로 마이그레이션
+    const legacy = localStorage.getItem('blog-draft:new')
+    if (legacy) {
+      try {
+        const parsed = JSON.parse(legacy)
+        const id = newDraftId()
+        list[id] = {
+          id,
+          title: parsed.title || '',
+          slug: parsed.slug || '',
+          content: parsed.content || '',
+          excerpt: parsed.excerpt || '',
+          published: !!parsed.published,
+          category: parsed.category || '경제',
+          savedAt: parsed.savedAt || new Date().toISOString(),
+          editingPostId: null,
+        }
+        persistDrafts(list)
+        localStorage.removeItem('blog-draft:new')
+      } catch {}
+    }
+    setDrafts(list)
+    setHasStoredDraft(Object.keys(list).length > 0)
   }, [showForm])
 
-  // 폼이 열려있는 동안 formData 를 localStorage 에 자동 저장 (디바운스)
+  // 폼이 열려있는 동안 formData 를 임시저장 리스트에 자동 저장 (디바운스)
   useEffect(() => {
     if (!showForm) return
     if (typeof window === 'undefined') return
     const t = setTimeout(() => {
-      const payload = {
-        ...formData,
+      // 자동저장은 빈 글까지 만들지 않음 — 제목/내용 둘 중 하나라도 있어야 저장
+      const isEmpty = !formData.title && !formData.content
+      if (isEmpty && !currentDraftId) return
+      const id = currentDraftId || newDraftId()
+      const payload: DraftPayload = {
+        id,
+        title: formData.title,
+        slug: formData.slug,
+        content: formData.content,
+        excerpt: formData.excerpt,
+        published: formData.published,
+        category: formData.category,
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
       }
-      try {
-        localStorage.setItem(getDraftKey(), JSON.stringify(payload))
-        setLastSavedAt(new Date())
-      } catch (e) {
-        // localStorage 용량 초과 등
-        console.warn('임시 저장 실패:', e)
-      }
+      const next = { ...loadDrafts(), [id]: payload }
+      persistDrafts(next)
+      setDrafts(next)
+      if (!currentDraftId) setCurrentDraftId(id)
+      setLastSavedAt(new Date())
     }, 800)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, showForm, editingPost])
+  }, [formData, showForm, editingPost, currentDraftId])
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -148,31 +218,10 @@ export default function AdminPage() {
     w.document.close()
   }
 
+  // 새 글: 빈 임시저장 슬롯 시작
   function handleNewPost() {
     setEditingPost(null)
-    // 새 글 임시저장 확인
-    const raw = typeof window !== 'undefined' ? localStorage.getItem('blog-draft:new') : null
-    if (raw) {
-      try {
-        const draft = JSON.parse(raw)
-        const savedAt = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ko-KR') : ''
-        const preview = (draft.title || '제목 없음') + (draft.content ? ' (내용 있음)' : '')
-        if (confirm(`이전에 작성 중이던 글이 있습니다.\n\n${preview}\n저장 시각: ${savedAt}\n\n이어서 작성하시겠습니까?\n(취소를 누르면 빈 글로 새로 시작합니다)`)) {
-          setFormData({
-            title: draft.title || '',
-            slug: draft.slug || '',
-            content: draft.content || '',
-            excerpt: draft.excerpt || '',
-            published: !!draft.published,
-            category: draft.category || '경제',
-          })
-          setShowForm(true)
-          return
-        } else {
-          localStorage.removeItem('blog-draft:new')
-        }
-      } catch {}
-    }
+    setCurrentDraftId(null) // 첫 자동저장 시 새 ID 생성
     setFormData({
       title: '',
       slug: '',
@@ -182,6 +231,42 @@ export default function AdminPage() {
       category: '경제'
     })
     setShowForm(true)
+  }
+
+  // 임시저장 리스트에서 하나 열기
+  function openDraft(d: DraftPayload) {
+    setEditingPost(null)
+    setCurrentDraftId(d.id)
+    setFormData({
+      title: d.title || '',
+      slug: d.slug || '',
+      content: d.content || '',
+      excerpt: d.excerpt || '',
+      published: !!d.published,
+      category: d.category || '경제',
+    })
+    setShowDraftList(false)
+    setShowForm(true)
+  }
+
+  // 임시저장 하나 삭제
+  function deleteDraft(id: string) {
+    if (!confirm('이 임시저장글을 삭제하시겠습니까?')) return
+    const next = { ...loadDrafts() }
+    delete next[id]
+    persistDrafts(next)
+    setDrafts(next)
+    setHasStoredDraft(Object.keys(next).length > 0)
+    if (currentDraftId === id) setCurrentDraftId(null)
+  }
+
+  // 모든 임시저장 비우기
+  function clearAllDrafts() {
+    if (!confirm('모든 임시저장글을 지우시겠습니까? 되돌릴 수 없습니다.')) return
+    persistDrafts({})
+    setDrafts({})
+    setHasStoredDraft(false)
+    setCurrentDraftId(null)
   }
 
   function handleEdit(post: Post) {
@@ -227,28 +312,69 @@ export default function AdminPage() {
     setShowForm(true)
   }
 
-  // 수동 임시 저장 (버튼 클릭)
+  // 수동 임시 저장 (버튼 클릭) — 새 ID로 또는 현재 ID에 저장
   function handleSaveDraft() {
     if (typeof window === 'undefined') return
     try {
-      localStorage.setItem(
-        getDraftKey(),
-        JSON.stringify({
-          ...formData,
-          savedAt: new Date().toISOString(),
-          editingPostId: editingPost?.id || null,
-        })
-      )
+      const id = currentDraftId || newDraftId()
+      const payload: DraftPayload = {
+        id,
+        title: formData.title,
+        slug: formData.slug,
+        content: formData.content,
+        excerpt: formData.excerpt,
+        published: formData.published,
+        category: formData.category,
+        savedAt: new Date().toISOString(),
+        editingPostId: editingPost?.id || null,
+      }
+      const next = { ...loadDrafts(), [id]: payload }
+      persistDrafts(next)
+      setDrafts(next)
+      if (!currentDraftId) setCurrentDraftId(id)
+      setHasStoredDraft(true)
       setLastSavedAt(new Date())
-      alert('임시 저장되었습니다. 나중에 이어서 작성할 수 있습니다.')
+      alert('임시 저장되었습니다. 임시저장글 목록에서 다시 열 수 있습니다.')
     } catch (e: any) {
       alert('임시 저장 실패: ' + (e?.message || e))
     }
   }
 
+  // 새 임시저장 사본 만들기 — 현재 폼 내용을 새 ID로 복제
+  function handleSaveAsNewDraft() {
+    if (typeof window === 'undefined') return
+    const id = newDraftId()
+    const payload: DraftPayload = {
+      id,
+      title: formData.title || '제목 없음',
+      slug: formData.slug,
+      content: formData.content,
+      excerpt: formData.excerpt,
+      published: formData.published,
+      category: formData.category,
+      savedAt: new Date().toISOString(),
+      editingPostId: editingPost?.id || null,
+    }
+    const next = { ...loadDrafts(), [id]: payload }
+    persistDrafts(next)
+    setDrafts(next)
+    setHasStoredDraft(true)
+    alert('새 임시저장 사본을 만들었습니다.')
+  }
+
   function clearDraft() {
     if (typeof window === 'undefined') return
+    // 폼이 닫힐 때(작성/수정 완료 또는 취소) 현재 작업 중이던 임시저장글 제거
+    if (currentDraftId) {
+      const next = { ...loadDrafts() }
+      delete next[currentDraftId]
+      persistDrafts(next)
+      setDrafts(next)
+      setHasStoredDraft(Object.keys(next).length > 0)
+    }
+    // 구버전 키 정리
     localStorage.removeItem(getDraftKey())
+    setCurrentDraftId(null)
     setLastSavedAt(null)
   }
 
@@ -473,6 +599,14 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={handleSaveAsNewDraft}
+                  className="bg-white text-amber-700 border border-amber-400 px-6 py-3 rounded-lg hover:bg-amber-50 transition font-medium"
+                  title="현재 내용을 별도 사본으로 임시 저장"
+                >
+                  📋 사본 저장
+                </button>
+                <button
+                  type="button"
                   onClick={handleExportPDF}
                   className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition font-medium"
                   title="A4 narrow margin(1.27cm)으로 PDF 저장"
@@ -496,28 +630,64 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* 새 글 임시 저장 복구 배너 (폼이 닫혀있을 때만 표시) */}
+        {/* 임시저장글 목록 (폼이 닫혀있을 때만 표시) */}
         {!showForm && hasStoredDraft && (
-          <div className="mb-8 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
-            <div className="text-sm text-amber-900">
-              💾 이전에 작성 중이던 <strong>새 글 임시 저장본</strong>이 있습니다. 이어서 작성할 수 있습니다.
-            </div>
-            <div className="flex gap-2">
+          <div className="mb-8 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+            <div className="bg-amber-100 px-4 py-2 flex items-center justify-between">
+              <div className="text-sm font-semibold text-amber-900">
+                💾 임시저장글 ({Object.keys(drafts).length}개)
+              </div>
               <button
                 type="button"
-                onClick={handleNewPost}
-                className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm font-medium"
+                onClick={clearAllDrafts}
+                className="text-xs text-amber-700 hover:text-amber-900 underline"
               >
-                이어서 작성
-              </button>
-              <button
-                type="button"
-                onClick={handleDiscardDraft}
-                className="bg-white text-amber-700 border border-amber-300 px-4 py-2 rounded hover:bg-amber-100 text-sm"
-              >
-                임시본 삭제
+                전체 삭제
               </button>
             </div>
+            <ul className="divide-y divide-amber-200">
+              {Object.values(drafts)
+                .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''))
+                .map((d) => {
+                  const preview = (d.content || '').replace(/<[^>]+>/g, '').slice(0, 60)
+                  const dateStr = d.savedAt
+                    ? new Date(d.savedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    : ''
+                  return (
+                    <li key={d.id} className="px-4 py-3 flex items-center gap-3 hover:bg-amber-100/50">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">
+                          {d.title || <span className="text-gray-400">제목 없음</span>}
+                        </div>
+                        {preview && (
+                          <div className="text-xs text-gray-500 truncate mt-0.5">{preview}</div>
+                        )}
+                        <div className="text-[11px] text-amber-700 mt-1 flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 bg-white border border-amber-200 rounded">{d.category || '경제'}</span>
+                          <span>저장 {dateStr}</span>
+                          {d.editingPostId && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">기존 글 수정중</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openDraft(d)}
+                          className="bg-amber-500 text-white px-3 py-1.5 rounded hover:bg-amber-600 text-sm font-medium"
+                        >
+                          이어쓰기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteDraft(d.id)}
+                          className="bg-white text-red-600 border border-red-300 px-3 py-1.5 rounded hover:bg-red-50 text-sm"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+            </ul>
           </div>
         )}
 
