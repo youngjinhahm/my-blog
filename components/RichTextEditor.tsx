@@ -2758,9 +2758,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         <div
           className="editor-zoom-wrapper"
           style={{
-            transform: `scale(${zoomLevel / 100})`,
-            transformOrigin: 'top center',
-            width: `${100 * 100 / zoomLevel}%`,
+            // @ts-ignore — `zoom` is widely supported and is what MS Word Online uses.
+            // Unlike `transform: scale()`, this rescales the layout box so the canvas
+            // scrollbar tracks the visible page size and the page is properly centered.
+            zoom: zoomLevel / 100,
           }}
         >
         <div
@@ -3200,8 +3201,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
         /* === 캔버스 오버플로우 수정 === */
         .editor-canvas-normal {
-          max-height: calc(100vh - 280px);
+          height: calc(100vh - 280px);
           min-height: 480px;
+          max-height: calc(100vh - 280px);
         }
         .editor-canvas-fullscreen {
           height: calc(100vh - 240px);
@@ -3274,8 +3276,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .editor-page.editor-page { background: #ffffff; }
 
         .editor-zoom-wrapper {
-          transition: transform 0.15s ease-out;
           margin: 0 auto;
+          width: 100%;
+          display: flex;
+          justify-content: center;
         }
         .editor-page {
           box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
