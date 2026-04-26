@@ -687,7 +687,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showSizeMenu, setShowSizeMenu] = useState(false)
   const [showColumnsMenu, setShowColumnsMenu] = useState(false)
   const [showBreaksMenu, setShowBreaksMenu] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState(100)
+  const [zoomLevel, setZoomLevel] = useState(120)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [charCount, setCharCount] = useState(0)
@@ -1797,7 +1797,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                 <div className="word-group-body word-font-body">
                   <div className="word-row">
                     <select onChange={handleFontFamilyChange} className="word-font-select" defaultValue="">
-                      <option value="">본문 폰트</option>
+                      <option value="">Times New Roman</option>
                       <optgroup label="최근 사용">
                         <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
                         <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕 (Body)</option>
@@ -1862,7 +1862,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                       </optgroup>
                     </select>
                     <select onChange={handleFontSizeChange} className="word-size-select" defaultValue="">
-                      <option value="" disabled>11</option>
+                      <option value="" disabled>10</option>
                       {[8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(s => <option key={s} value={`${s}pt`}>{s}</option>)}
                     </select>
                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(1)} className="word-btn-mini" title="글자 크기 크게">
@@ -2905,8 +2905,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       <style jsx global>{`
         .ProseMirror {
           outline: none;
-          font-family: 'Calibri', '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
-          font-size: 11pt;
+          font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif;
+          font-size: 10pt;
           line-height: 1.5;
           color: #1f2937;
         }
@@ -3394,12 +3394,6 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           border-color: #0078d4;
           box-shadow: 0 0 0 1px #0078d4;
           outline: none;
-        }
-
-
-          font-size: 11pt;
-          line-height: 1.5;
-          color: #1f2937;
         }
 
         /* === Word 스타일 캔버스 === */
