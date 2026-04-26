@@ -2907,7 +2907,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           outline: none;
           font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif;
           font-size: 10pt;
-          line-height: 1.5;
+          line-height: 1.0;
           color: #1f2937;
         }
 
