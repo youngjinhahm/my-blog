@@ -2910,6 +2910,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           line-height: 1.0;
           color: #1f2937;
         }
+        /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
+        .ProseMirror p,
+        .ProseMirror h1,
+        .ProseMirror h2,
+        .ProseMirror h3,
+        .ProseMirror h4,
+        .ProseMirror h5,
+        .ProseMirror h6,
+        .ProseMirror ul,
+        .ProseMirror ol,
+        .ProseMirror blockquote {
+          margin-top: 0;
+          margin-bottom: 0;
+        }
 
         /* ============================================
            MS Word 365 정확 재현 - 전체 셸 (flex column app shell)
