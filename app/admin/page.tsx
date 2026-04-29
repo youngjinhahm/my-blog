@@ -375,6 +375,26 @@ export default function AdminPage() {
     alert('임시 저장본을 삭제했습니다.')
   }
 
+  // slug 중복일 때 사용 가능한 slug 찾기 (예: smoot-hawley -> smoot-hawley-2 -> -3 ...)
+  async function findAvailableSlug(base: string, excludeId?: string): Promise<string> {
+    const trimmed = (base || 'post').trim().replace(/\s+/g, '-').toLowerCase()
+    let candidate = trimmed
+    for (let i = 2; i < 100; i++) {
+      const q = supabase.from('posts').select('id').eq('slug', candidate)
+      const { data } = await q
+      const taken = (data || []).filter((r: any) => r.id !== excludeId)
+      if (taken.length === 0) return candidate
+      candidate = `${trimmed}-${i}`
+    }
+    return `${trimmed}-${Date.now()}`
+  }
+
+  function isDuplicateSlugError(err: any): boolean {
+    if (!err) return false
+    const msg = (err.message || '').toLowerCase()
+    return err.code === '23505' || msg.includes('posts_slug_key') || (msg.includes('duplicate') && msg.includes('slug'))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     
@@ -394,7 +414,13 @@ export default function AdminPage() {
         .eq('id', editingPost.id)
       
       if (error) {
-        alert('수정 실패: ' + error.message)
+        if (isDuplicateSlugError(error)) {
+          const fresh = await findAvailableSlug(formData.slug, editingPost.id)
+          alert(`수정 실패: slug "${formData.slug}"가 이미 다른 글에 사용 중입니다.\n\n추천 slug: ${fresh}\n\nslug 칸을 수정한 뒤 다시 시도하세요.`)
+          setFormData({ ...formData, slug: fresh })
+        } else {
+          alert('수정 실패: ' + error.message)
+        }
       } else {
         alert('글이 수정되었습니다!')
         clearDraft()
@@ -402,11 +428,16 @@ export default function AdminPage() {
         fetchPosts()
       }
     } else {
+      // 새 글: slug가 비어있거나 충돌하면 자동으로 사용 가능한 slug 생성
+      let slug = formData.slug.trim()
+      if (!slug) slug = await findAvailableSlug(formData.title || 'post')
+      else slug = await findAvailableSlug(slug)
+
       const { error } = await supabase
         .from('posts')
         .insert([{
           title: formData.title,
-          slug: formData.slug,
+          slug,
           content: formData.content,
           excerpt: formData.excerpt || null,
           published: formData.published,
@@ -416,9 +447,17 @@ export default function AdminPage() {
         }])
 
       if (error) {
-        alert('작성 실패: ' + error.message)
+        if (isDuplicateSlugError(error)) {
+          alert(`작성 실패: slug "${slug}"가 이미 사용 중입니다. 다른 slug로 변경 후 다시 시도하세요.`)
+        } else {
+          alert('작성 실패: ' + error.message)
+        }
       } else {
-        alert('글이 작성되었습니다!')
+        if (slug !== formData.slug) {
+          alert(`글이 작성되었습니다.\n(slug "${formData.slug}"가 중복이라 "${slug}"로 자동 변경되었습니다.)`)
+        } else {
+          alert('글이 작성되었습니다!')
+        }
         clearDraft()
         setShowForm(false)
         fetchPosts()
