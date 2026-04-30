@@ -250,7 +250,18 @@ export default function AdminPage() {
 
   // 임시저장 리스트에서 하나 열기
   function openDraft(d: DraftPayload) {
-    setEditingPost(null)
+    // 이 임시저장글이 기존 글의 수정중 상태였다면 editingPost 복원 → 수정 완료 시 UPDATE
+    if (d.editingPostId) {
+      const original = posts.find(p => p.id === d.editingPostId)
+      if (original) {
+        setEditingPost(original)
+      } else {
+        // 원본 글을 못 찾으면(삭제됐거나 다른 계정) 새 글로 처리
+        setEditingPost(null)
+      }
+    } else {
+      setEditingPost(null)
+    }
     setCurrentDraftId(d.id)
     setFormData({
       title: d.title || '',
