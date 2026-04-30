@@ -198,6 +198,16 @@ export default function AdminPage() {
   .content h3 { font-size: 13pt; margin: 14px 0 6px; }
   .content p { margin: 8px 0; }
   .content img { max-width: 100%; height: auto; }
+  .content img[data-align="center"] { display: block; margin-left: auto; margin-right: auto; }
+  .content img[data-align="left"] { display: block; margin-left: 0; margin-right: auto; }
+  .content img[data-align="right"] { display: block; margin-left: auto; margin-right: 0; }
+  /* 정렬을 가진 이미지가 부모 단락에 들어있을 경우에도 가운데/오른쪽 정렬이 작동하도록 보장 */
+  .content p:has(> img[data-align="center"]) { text-align: center; }
+  .content p:has(> img[data-align="right"]) { text-align: right; }
+  .content p:has(> img[data-align="left"]) { text-align: left; }
+  .content [data-align="center"] img { display: block; margin-left: auto; margin-right: auto; }
+  .content [data-align="right"] img { display: block; margin-left: auto; margin-right: 0; }
+  .content [data-align="left"] img { display: block; margin-left: 0; margin-right: auto; }
   .content table { border-collapse: collapse; width: 100%; margin: 12px 0; }
   .content table td, .content table th { border: 1px solid #9ca3af; padding: 6px 8px; }
   .content table th { background: #f3f4f6; }
@@ -406,7 +416,7 @@ export default function AdminPage() {
           slug: formData.slug,
           content: formData.content,
           excerpt: formData.excerpt || null,
-          published: formData.published,
+          published: true,
           is_private: formData.is_private,
           category: formData.category,
           updated_at: new Date().toISOString()
@@ -440,7 +450,7 @@ export default function AdminPage() {
           slug,
           content: formData.content,
           excerpt: formData.excerpt || null,
-          published: formData.published,
+          published: true,
           is_private: formData.is_private,
           category: formData.category,
           author_id: user.id
@@ -602,18 +612,6 @@ export default function AdminPage() {
                 <div className="flex items-center">
                   <input
                     type="checkbox"
-                    id="published"
-                    checked={formData.published}
-                    onChange={(e) => setFormData({...formData, published: e.target.checked})}
-                    className="mr-2 w-4 h-4"
-                  />
-                  <label htmlFor="published" className="text-sm font-medium text-gray-700">
-                    발행하기
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
                     id="is_private"
                     checked={formData.is_private}
                     onChange={(e) => setFormData({...formData, is_private: e.target.checked})}
@@ -756,16 +754,13 @@ export default function AdminPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          post.published 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {post.published ? '발행됨' : '초안'}
-                        </span>
-                        {(post as any).is_private && (
+                        {(post as any).is_private ? (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
                             🔒 비밀글
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            게시중
                           </span>
                         )}
                       </div>

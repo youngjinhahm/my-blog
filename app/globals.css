@@ -136,3 +136,29 @@
 .prose table.banded-columns th:nth-child(even) { background-color: #f9fafb; }
 
 /* per-edge 인라인 테두리가 프리셋보다 우선이므로 !important 제거됨 */
+/* === 이미지 정렬 (data-align) === */
+/* 에디터에서 저장된 <img data-align="..."> 가 공개 페이지/PDF에서도 동일하게 정렬되도록 */
+.prose img[data-align="center"],
+.content img[data-align="center"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.prose img[data-align="left"],
+.content img[data-align="left"] {
+  display: block;
+  margin-left: 0;
+  margin-right: auto;
+}
+.prose img[data-align="right"],
+.content img[data-align="right"] {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
+}
+.prose p:has(> img[data-align="center"]),
+.content p:has(> img[data-align="center"]) { text-align: center; }
+.prose p:has(> img[data-align="right"]),
+.content p:has(> img[data-align="right"]) { text-align: right; }
+.prose p:has(> img[data-align="left"]),
+.content p:has(> img[data-align="left"]) { text-align: left; }
