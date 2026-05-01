@@ -17,7 +17,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
-import { Mark, Node, Extension } from '@tiptap/core'
+import { Mark, Node, Extension, textInputRule } from '@tiptap/core'
 import { CellSelection, TableMap } from '@tiptap/pm/tables'
 import { NodeSelection } from '@tiptap/pm/state'
 
@@ -287,6 +287,36 @@ const Indent = Extension.create({
       setSpaceBefore: (px: number) => updateIfPara('spaceBefore', px),
       setSpaceAfter: (px: number) => updateIfPara('spaceAfter', px),
     } as any
+  },
+})
+
+// MS Word 스타일 자동 대체 (자동 고침)
+//   --   → — (em dash)  ← Word 기본 동작
+//   ->   → → (right arrow)
+//   <-   → ← (left arrow)
+//   ...  → … (horizontal ellipsis)
+//   (c)  → ©
+//   (r)  → ®
+//   (tm) → ™
+const SmartTypography = Extension.create({
+  name: 'smartTypography',
+  addInputRules() {
+    return [
+      // 두 개의 연속된 하이픈을 em dash 로
+      textInputRule({ find: /--$/, replace: '—' }),
+      // -> → →
+      textInputRule({ find: /->$/, replace: '→' }),
+      // <- → ←
+      textInputRule({ find: /<-$/, replace: '←' }),
+      // ... → …
+      textInputRule({ find: /\.\.\.$/, replace: '…' }),
+      // (c) → ©
+      textInputRule({ find: /\(c\)$/i, replace: '©' }),
+      // (r) → ®
+      textInputRule({ find: /\(r\)$/i, replace: '®' }),
+      // (tm) → ™
+      textInputRule({ find: /\(tm\)$/i, replace: '™' }),
+    ]
   },
 })
 
@@ -725,6 +755,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       }),
       Underline,
       FontSize,
+      SmartTypography,
       LineHeight,
       Indent,
       Color,
