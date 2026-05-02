@@ -40,33 +40,99 @@ export default function AdminPage() {
     savedAt: string
     editingPostId?: string | null
   }
-  const DRAFTS_KEY = 'blog-drafts-v2'
+  const DRAFTS_KEY = 'blog-drafts-v2' // localStorage 캐시 (오프라인 폴백)
   const [drafts, setDrafts] = useState<Record<string, DraftPayload>>({})
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [showDraftList, setShowDraftList] = useState(false)
 
-  // 구버전 단일 임시저장 키 호환용 (기존 글 수정 페이지에 한정)
   const getDraftKey = () => `blog-draft:${editingPost?.id || 'new'}`
 
-  // 모든 임시저장글 로드
-  const loadDrafts = (): Record<string, DraftPayload> => {
-    if (typeof window === 'undefined') return {}
-    try {
-      const raw = localStorage.getItem(DRAFTS_KEY)
-      if (!raw) return {}
-      return JSON.parse(raw) as Record<string, DraftPayload>
-    } catch {
-      return {}
-    }
-  }
-  const persistDrafts = (next: Record<string, DraftPayload>) => {
+  // localStorage 캐시 (오프라인이거나 Supabase 호출이 늦을 때 즉시 표시용)
+  const cacheDraftsLocal = (next: Record<string, DraftPayload>) => {
     if (typeof window === 'undefined') return
     try {
       localStorage.setItem(DRAFTS_KEY, JSON.stringify(next))
     } catch (e) {
-      console.warn('임시저장 저장 실패:', e)
+      console.warn('임시저장 캐시 실패:', e)
     }
   }
+  const readLocalCache = (): Record<string, DraftPayload> => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(DRAFTS_KEY)
+      return raw ? (JSON.parse(raw) as Record<string, DraftPayload>) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  // Supabase row → DraftPayload 변환
+  const rowToDraft = (r: any): DraftPayload => ({
+    id: r.id,
+    title: r.title || '',
+    slug: r.slug || '',
+    content: r.content || '',
+    excerpt: r.excerpt || '',
+    published: !!r.published,
+    is_private: !!r.is_private,
+    category: r.category || '경제',
+    savedAt: r.saved_at,
+    editingPostId: r.editing_post_id || null,
+  })
+
+  // Supabase 에서 본인 임시저장글 모두 불러오기
+  const fetchDraftsFromCloud = async (): Promise<Record<string, DraftPayload>> => {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    if (!u) return {}
+    const { data, error } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('user_id', u.id)
+      .order('saved_at', { ascending: false })
+    if (error) {
+      console.warn('drafts 로드 실패 (테이블이 아직 없을 수 있음):', error.message)
+      return readLocalCache()
+    }
+    const map: Record<string, DraftPayload> = {}
+    ;(data || []).forEach((r: any) => { map[r.id] = rowToDraft(r) })
+    cacheDraftsLocal(map)
+    return map
+  }
+
+  // 한 건 upsert (Supabase + 로컬 캐시)
+  const upsertDraftCloud = async (payload: DraftPayload): Promise<void> => {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    if (!u) return
+    const row = {
+      id: payload.id,
+      user_id: u.id,
+      title: payload.title,
+      slug: payload.slug,
+      content: payload.content,
+      excerpt: payload.excerpt,
+      is_private: payload.is_private,
+      category: payload.category,
+      editing_post_id: payload.editingPostId || null,
+      saved_at: payload.savedAt,
+    }
+    const { error } = await supabase.from('drafts').upsert(row, { onConflict: 'id' })
+    if (error) console.warn('drafts upsert 실패:', error.message)
+  }
+
+  // 한 건 삭제
+  const deleteDraftCloud = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('drafts').delete().eq('id', id)
+    if (error) console.warn('drafts 삭제 실패:', error.message)
+  }
+
+  // 전체 비우기
+  const clearAllDraftsCloud = async (): Promise<void> => {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    if (!u) return
+    const { error } = await supabase.from('drafts').delete().eq('user_id', u.id)
+    if (error) console.warn('drafts 전체 삭제 실패:', error.message)
+  }
+
   const newDraftId = () =>
     `d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
@@ -74,42 +140,53 @@ export default function AdminPage() {
     checkUser()
   }, [])
 
-  // 페이지 로드 시 임시저장글 목록 동기화 + 구버전 마이그레이션
+  // 페이지 로드 / 폼 닫힘 시 클라우드에서 임시저장 목록 동기화
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const list = loadDrafts()
-    // 구버전 'blog-draft:new'을 v2 리스트로 마이그레이션
-    const legacy = localStorage.getItem('blog-draft:new')
-    if (legacy) {
-      try {
-        const parsed = JSON.parse(legacy)
-        const id = newDraftId()
-        list[id] = {
-          id,
-          title: parsed.title || '',
-          slug: parsed.slug || '',
-          content: parsed.content || '',
-          excerpt: parsed.excerpt || '',
-          published: !!parsed.published,
-          is_private: !!parsed.is_private,
-          category: parsed.category || '경제',
-          savedAt: parsed.savedAt || new Date().toISOString(),
-          editingPostId: null,
-        }
-        persistDrafts(list)
-        localStorage.removeItem('blog-draft:new')
-      } catch {}
-    }
-    setDrafts(list)
-    setHasStoredDraft(Object.keys(list).length > 0)
+    let cancelled = false
+    // 일단 캐시로 즉시 보여줌 (UX), 그 다음 Supabase 결과로 덮어쓰기
+    const cached = readLocalCache()
+    setDrafts(cached)
+    setHasStoredDraft(Object.keys(cached).length > 0)
+    ;(async () => {
+      // 로컬 잔여물(localStorage 단독본) → 클라우드로 마이그레이션
+      const legacy = localStorage.getItem('blog-draft:new')
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy)
+          const id = newDraftId()
+          await upsertDraftCloud({
+            id,
+            title: parsed.title || '',
+            slug: parsed.slug || '',
+            content: parsed.content || '',
+            excerpt: parsed.excerpt || '',
+            published: !!parsed.published,
+            is_private: !!parsed.is_private,
+            category: parsed.category || '경제',
+            savedAt: parsed.savedAt || new Date().toISOString(),
+            editingPostId: null,
+          })
+          localStorage.removeItem('blog-draft:new')
+        } catch {}
+      }
+      // 캐시본 중 클라우드에 없는 것도 마이그레이션
+      for (const v of Object.values(cached)) {
+        await upsertDraftCloud(v)
+      }
+      const list = await fetchDraftsFromCloud()
+      if (cancelled) return
+      setDrafts(list)
+      setHasStoredDraft(Object.keys(list).length > 0)
+    })()
+    return () => { cancelled = true }
   }, [showForm])
 
-  // 폼이 열려있는 동안 formData 를 임시저장 리스트에 자동 저장 (디바운스)
+  // 폼이 열려있는 동안 formData 를 클라우드에 자동 저장 (디바운스)
   useEffect(() => {
     if (!showForm) return
     if (typeof window === 'undefined') return
-    const t = setTimeout(() => {
-      // 자동저장은 빈 글까지 만들지 않음 — 제목/내용 둘 중 하나라도 있어야 저장
+    const t = setTimeout(async () => {
       const isEmpty = !formData.title && !formData.content
       if (isEmpty && !currentDraftId) return
       const id = currentDraftId || newDraftId()
@@ -125,8 +202,9 @@ export default function AdminPage() {
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
       }
-      const next = { ...loadDrafts(), [id]: payload }
-      persistDrafts(next)
+      await upsertDraftCloud(payload)
+      const next = { ...drafts, [id]: payload }
+      cacheDraftsLocal(next)
       setDrafts(next)
       if (!currentDraftId) setCurrentDraftId(id)
       setLastSavedAt(new Date())
@@ -276,21 +354,23 @@ export default function AdminPage() {
     setShowForm(true)
   }
 
-  // 임시저장 하나 삭제
-  function deleteDraft(id: string) {
+  // 임시저장 하나 삭제 (클라우드 + 캐시)
+  async function deleteDraft(id: string) {
     if (!confirm('이 임시저장글을 삭제하시겠습니까?')) return
-    const next = { ...loadDrafts() }
+    await deleteDraftCloud(id)
+    const next = { ...drafts }
     delete next[id]
-    persistDrafts(next)
+    cacheDraftsLocal(next)
     setDrafts(next)
     setHasStoredDraft(Object.keys(next).length > 0)
     if (currentDraftId === id) setCurrentDraftId(null)
   }
 
-  // 모든 임시저장 비우기
-  function clearAllDrafts() {
+  // 모든 임시저장 비우기 (클라우드 + 캐시)
+  async function clearAllDrafts() {
     if (!confirm('모든 임시저장글을 지우시겠습니까? 되돌릴 수 없습니다.')) return
-    persistDrafts({})
+    await clearAllDraftsCloud()
+    cacheDraftsLocal({})
     setDrafts({})
     setHasStoredDraft(false)
     setCurrentDraftId(null)
@@ -341,8 +421,8 @@ export default function AdminPage() {
     setShowForm(true)
   }
 
-  // 수동 임시 저장 (버튼 클릭) — 새 ID로 또는 현재 ID에 저장
-  function handleSaveDraft() {
+  // 수동 임시 저장 (버튼 클릭) — Supabase 에 저장하여 다른 기기에서도 이어쓰기 가능
+  async function handleSaveDraft() {
     if (typeof window === 'undefined') return
     try {
       const id = currentDraftId || newDraftId()
@@ -358,30 +438,30 @@ export default function AdminPage() {
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
       }
-      const next = { ...loadDrafts(), [id]: payload }
-      persistDrafts(next)
+      await upsertDraftCloud(payload)
+      const next = { ...drafts, [id]: payload }
+      cacheDraftsLocal(next)
       setDrafts(next)
       if (!currentDraftId) setCurrentDraftId(id)
       setHasStoredDraft(true)
       setLastSavedAt(new Date())
-      alert('임시 저장되었습니다. 임시저장글 목록에서 다시 열 수 있습니다.')
+      alert('임시 저장되었습니다. 다른 기기에서도 이어쓰기 할 수 있습니다.')
     } catch (e: any) {
       alert('임시 저장 실패: ' + (e?.message || e))
     }
   }
 
 
-  function clearDraft() {
+  async function clearDraft() {
     if (typeof window === 'undefined') return
-    // 폼이 닫힐 때(작성/수정 완료 또는 취소) 현재 작업 중이던 임시저장글 제거
     if (currentDraftId) {
-      const next = { ...loadDrafts() }
+      await deleteDraftCloud(currentDraftId)
+      const next = { ...drafts }
       delete next[currentDraftId]
-      persistDrafts(next)
+      cacheDraftsLocal(next)
       setDrafts(next)
       setHasStoredDraft(Object.keys(next).length > 0)
     }
-    // 구버전 키 정리
     localStorage.removeItem(getDraftKey())
     setCurrentDraftId(null)
     setLastSavedAt(null)
