@@ -823,7 +823,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg max-w-none focus:outline-none min-h-[26cm]',
+        class: 'max-w-none focus:outline-none min-h-[26cm]',
       },
       handleKeyDown: (view, event) => {
         // Ctrl+F = Find
@@ -2956,10 +2956,16 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       <style jsx global>{`
         .ProseMirror {
           outline: none;
-          font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif;
+          font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif !important;
+          font-size: 10pt !important;
+          line-height: 1.0 !important;
+          color: #1f2937;
+        }
+        /* p/h/li 도 명시적으로 → 컨테이너의 .prose 잔여물에서 살아남도록 */
+        .ProseMirror p,
+        .ProseMirror li {
           font-size: 10pt;
           line-height: 1.0;
-          color: #1f2937;
         }
         /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
         .ProseMirror p,
