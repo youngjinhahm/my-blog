@@ -452,16 +452,27 @@ export default function AdminPage() {
   }
 
 
-  async function clearDraft() {
+  async function clearDraft(opts?: { editingPostId?: string | null }) {
     if (typeof window === 'undefined') return
-    if (currentDraftId) {
-      await deleteDraftCloud(currentDraftId)
-      const next = { ...drafts }
-      delete next[currentDraftId]
-      cacheDraftsLocal(next)
-      setDrafts(next)
-      setHasStoredDraft(Object.keys(next).length > 0)
+    const next = { ...drafts }
+    const idsToDelete: string[] = []
+    if (currentDraftId) idsToDelete.push(currentDraftId)
+    // Safety net: drop any draft tied to the post we just published (in case
+    // autosave hadnt run yet, or this draft was started in a different session)
+    if (opts?.editingPostId) {
+      Object.values(drafts).forEach((d) => {
+        if (d.editingPostId === opts.editingPostId && !idsToDelete.includes(d.id)) {
+          idsToDelete.push(d.id)
+        }
+      })
     }
+    for (const id of idsToDelete) {
+      await deleteDraftCloud(id)
+      delete next[id]
+    }
+    cacheDraftsLocal(next)
+    setDrafts(next)
+    setHasStoredDraft(Object.keys(next).length > 0)
     localStorage.removeItem(getDraftKey())
     setCurrentDraftId(null)
     setLastSavedAt(null)
@@ -524,7 +535,7 @@ export default function AdminPage() {
         }
       } else {
         alert('글이 수정되었습니다!')
-        clearDraft()
+        await clearDraft({ editingPostId: editingPost.id })
         setShowForm(false)
         fetchPosts()
       }
@@ -559,7 +570,7 @@ export default function AdminPage() {
         } else {
           alert('글이 작성되었습니다!')
         }
-        clearDraft()
+        await clearDraft()
         setShowForm(false)
         fetchPosts()
       }
