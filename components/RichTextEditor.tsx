@@ -153,6 +153,26 @@ const FontSize = Mark.create({
       },
     }
   },
+
+  // MS Word 단축키:
+  //   Ctrl+]  → 글자 크기 +1pt
+  //   Ctrl+[  → 글자 크기 -1pt
+  addKeyboardShortcuts() {
+    const adjust = (delta: number) => () => {
+      const ed: any = (this as any).editor
+      if (!ed) return false
+      const attrs: any = ed.getAttributes('fontSize') || {}
+      const raw = (attrs.fontSize || '10pt') as string
+      const cur = parseFloat(raw.replace('pt', '')) || 10
+      const next = Math.min(409, Math.max(1, Math.round(cur + delta)))
+      ed.chain().focus().setFontSize(`${next}pt`).run()
+      return true
+    }
+    return {
+      'Mod-]': adjust(1),
+      'Mod-[': adjust(-1),
+    }
+  },
 })
 
 // 줄 간격 (Line Spacing) Extension — paragraph / heading 에 lineHeight 적용
