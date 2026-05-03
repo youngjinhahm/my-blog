@@ -1014,8 +1014,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     const rect = img.getBoundingClientRect()
     const editorRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
       || editor.view.dom.getBoundingClientRect()
+    // 툴바를 이미지 바로 아래(파란 리사이즈 핸들 박스 밑)에 붙임
     setImageToolbarPos({
-      top: rect.top - editorRect.top - 44,
+      top: rect.bottom - editorRect.top + 6,
       left: rect.left - editorRect.left + rect.width / 2,
     })
     setShowImageToolbar(true)
