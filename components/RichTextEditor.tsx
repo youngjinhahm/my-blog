@@ -1167,14 +1167,46 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     const readFontInfo = () => {
       const styleAttrs = editor.getAttributes('textStyle') as any
       const sizeAttrs = editor.getAttributes('fontSize') as any
-      setCurrentFontFamily(styleAttrs?.fontFamily || '')
-      setCurrentFontSize(sizeAttrs?.fontSize || '')
+      let font = styleAttrs?.fontFamily || ''
+      let size = sizeAttrs?.fontSize || ''
+      // 마크가 없으면 커서 위치 DOM 의 computed style 에서 추출
+      if (!font || !size) {
+        try {
+          const sel = window.getSelection()
+          const node = sel?.anchorNode
+          const el = (node && node.nodeType === 3 ? node.parentElement : node) as HTMLElement | null
+          if (el && editor.view.dom.contains(el)) {
+            const cs = window.getComputedStyle(el)
+            if (!font && cs.fontFamily) font = cs.fontFamily
+            if (!size && cs.fontSize) {
+              const px = parseFloat(cs.fontSize)
+              if (!isNaN(px)) size = `${Math.round(px * 0.75 * 10) / 10}pt`
+            }
+          }
+        } catch {}
+      }
+      setCurrentFontFamily(font)
+      setCurrentFontSize(size)
     }
     readFontInfo()
-    const u1 = editor.on('selectionUpdate', readFontInfo)
-    const u2 = editor.on('transaction', readFontInfo)
-    return () => { try { (u1 as any)?.(); (u2 as any)?.() } catch {} }
+    editor.on('selectionUpdate', readFontInfo)
+    editor.on('transaction', readFontInfo)
+    return () => {
+      try { editor.off('selectionUpdate', readFontInfo); editor.off('transaction', readFontInfo) } catch {}
+    }
   }, [editor])
+
+  // 서식 복사 모드일 때: 사용자가 텍스트를 선택하는 순간 캡쳐된 서식을 적용
+  useEffect(() => {
+    if (!editor || !painterMode || !painterMarks) return
+    const handler = () => {
+      if (editor.state.selection.empty) return
+      applyPainterMarks()
+    }
+    editor.on('selectionUpdate', handler)
+    return () => { try { editor.off('selectionUpdate', handler) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, painterMode, painterMarks, painterLocked])
 
 
   // 현재 선택이 속한 표 노드와 위치를 찾음
@@ -1539,14 +1571,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editor.chain().focus().setFontSize(`${next}pt`).run()
   }
 
-    const applyPainterMarks = () => {
+  const applyPainterMarks = () => {
     if (!editor || !painterMarks || editor.state.selection.empty) return
-    const chain = editor.chain().focus()
-    if (painterMarks.bold) chain.setBold()
-    if (painterMarks.italic) chain.setItalic()
-    if (painterMarks.underline) chain.setUnderline()
-    if (painterMarks.strike) chain.setStrike()
-    if (painterMarks.color) chain.setColor(painterMarks.color)
+    const chain: any = editor.chain().focus()
+    // 인라인 마크
+    if (painterMarks.bold) chain.setBold(); else chain.unsetBold && chain.unsetBold()
+    if (painterMarks.italic) chain.setItalic(); else chain.unsetItalic && chain.unsetItalic()
+    if (painterMarks.underline) chain.setUnderline(); else chain.unsetUnderline && chain.unsetUnderline()
+    if (painterMarks.strike) chain.setStrike(); else chain.unsetStrike && chain.unsetStrike()
+    // 색상 / 형광펜
+    if (painterMarks.color) chain.setColor(painterMarks.color); else chain.unsetColor && chain.unsetColor()
+    if (painterMarks.highlight) chain.setHighlight({ color: painterMarks.highlight }); else chain.unsetHighlight && chain.unsetHighlight()
+    // 글꼴 / 글자 크기
+    if (painterMarks.fontFamily) chain.setFontFamily(painterMarks.fontFamily)
+    if (painterMarks.fontSize) chain.setFontSize(painterMarks.fontSize)
     chain.run()
     if (!painterLocked) {
       setPainterMode(false)
@@ -1566,8 +1604,13 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     marks.italic = editor.isActive('italic')
     marks.underline = editor.isActive('underline')
     marks.strike = editor.isActive('strike')
-    const attrs = editor.getAttributes('textStyle')
-    if (attrs && attrs.color) marks.color = attrs.color
+    const attrs = editor.getAttributes('textStyle') as any
+    if (attrs?.color) marks.color = attrs.color
+    if (attrs?.fontFamily) marks.fontFamily = attrs.fontFamily
+    const sizeAttrs = editor.getAttributes('fontSize') as any
+    if (sizeAttrs?.fontSize) marks.fontSize = sizeAttrs.fontSize
+    const hl = editor.getAttributes('highlight') as any
+    if (hl?.color) marks.highlight = hl.color
     setPainterMarks(marks)
     setPainterMode(true)
   }
@@ -1826,7 +1869,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }
 
   return (
-    <div className={`word-app ${isFullscreen ? 'fixed inset-0 z-50' : 'rounded-md overflow-hidden border border-[#c1c3c7]'}`}>
+    <div data-painter={painterMode ? '1' : '0'} className={`word-app ${isFullscreen ? 'fixed inset-0 z-50' : 'rounded-md overflow-hidden border border-[#c1c3c7]'}`}>
       {/* ===== MS Word 365 스타일 타이틀 바 + QAT + 리본 ===== */}
       <div className="sticky top-0 z-20 word-chrome">
 
@@ -1906,7 +1949,13 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="8" y="4" width="12" height="14" rx="1" stroke="currentColor" strokeWidth="1.3" fill="#fff"/><path d="M5 8v10a2 2 0 002 2h9" stroke="currentColor" strokeWidth="1.3" fill="none"/></svg>
                       <span>복사</span>
                     </button>
-                    <button type="button" onClick={togglePainter} className={`word-btn-small ${painterMode ? 'word-btn-active' : ''}`} title="서식 복사">
+                    <button
+                      type="button"
+                      onClick={() => { setPainterLocked(false); togglePainter() }}
+                      onDoubleClick={() => { if (!painterMode) togglePainter(); setPainterLocked(true) }}
+                      className={`word-btn-small ${painterMode ? 'word-btn-active' : ''}`}
+                      title="서식 복사 (더블클릭하면 여러 번 적용 가능, ESC 로 해제)"
+                    >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h10v3H5z" fill="currentColor"/><path d="M15 5h2a2 2 0 012 2v3H13" stroke="currentColor" strokeWidth="1.3" fill="none"/><path d="M7 8v3h6v-1" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="8" y="13" width="4" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="#fde68a"/></svg>
                       <span>서식 복사</span>
                     </button>
@@ -3558,6 +3607,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           background: #ffffff;
           box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
           border: 1px solid #d2d0ce;
+        }
+        /* 서식 복사 모드 활성화 시 에디터 안 커서 모양을 페인트 브러시로 (Word 동일) */
+        .word-app[data-painter="1"] .ProseMirror,
+        .word-app[data-painter="1"] .ProseMirror * {
+          cursor: cell !important;
         }
         .editor-page.editor-page { background: #ffffff; }
 
