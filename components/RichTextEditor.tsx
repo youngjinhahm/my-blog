@@ -1196,20 +1196,24 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }, [editor])
 
-  // 서식 복사 모드일 때: 사용자가 마우스를 떼는 순간(드래그 완료) 적용
-  // selectionUpdate 는 드래그 중에도 매번 발생해서 부적절. mouseup 으로 한 번만 트리거.
+  // 서식 복사 모드일 때: 마우스를 떼는 즉시 적용 (지연 없음)
+  // - mouseup 시점에 selection 이 이미 확정되어 있으면 동기 적용
+  // - 아직 비어있으면(드물게 선택 커밋이 늦는 경우) 다음 프레임 한 번만 retry
   useEffect(() => {
     if (!editor || !painterMode || !painterMarks) return
     const dom = editor.view.dom as HTMLElement
-    const onMouseUp = () => {
-      // 다음 프레임까지 기다려 ProseMirror 가 selection 을 확정한 뒤 적용
-      requestAnimationFrame(() => {
-        if (!editor || editor.state.selection.empty) return
-        applyPainterMarks()
-      })
+    const tryApply = () => {
+      if (!editor || editor.state.selection.empty) return false
+      applyPainterMarks()
+      return true
     }
-    dom.addEventListener('mouseup', onMouseUp)
-    return () => { try { dom.removeEventListener('mouseup', onMouseUp) } catch {} }
+    const onMouseUp = () => {
+      if (tryApply()) return
+      requestAnimationFrame(() => { tryApply() })
+    }
+    // capture 단계로 등록하여 다른 핸들러보다 먼저 처리
+    dom.addEventListener('mouseup', onMouseUp, true)
+    return () => { try { dom.removeEventListener('mouseup', onMouseUp, true) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
 
