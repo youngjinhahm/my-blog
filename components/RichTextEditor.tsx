@@ -1196,15 +1196,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }, [editor])
 
-  // 서식 복사 모드일 때: 사용자가 텍스트를 선택하는 순간 캡쳐된 서식을 적용
+  // 서식 복사 모드일 때: 사용자가 마우스를 떼는 순간(드래그 완료) 적용
+  // selectionUpdate 는 드래그 중에도 매번 발생해서 부적절. mouseup 으로 한 번만 트리거.
   useEffect(() => {
     if (!editor || !painterMode || !painterMarks) return
-    const handler = () => {
-      if (editor.state.selection.empty) return
-      applyPainterMarks()
+    const dom = editor.view.dom as HTMLElement
+    const onMouseUp = () => {
+      // 다음 프레임까지 기다려 ProseMirror 가 selection 을 확정한 뒤 적용
+      requestAnimationFrame(() => {
+        if (!editor || editor.state.selection.empty) return
+        applyPainterMarks()
+      })
     }
-    editor.on('selectionUpdate', handler)
-    return () => { try { editor.off('selectionUpdate', handler) } catch {} }
+    dom.addEventListener('mouseup', onMouseUp)
+    return () => { try { dom.removeEventListener('mouseup', onMouseUp) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
 
@@ -1599,6 +1604,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       setPainterMarks(null)
       return
     }
+    // 1) 마크/속성 직접 조회 (선택이 있는 경우)
     const marks: any = {}
     marks.bold = editor.isActive('bold')
     marks.italic = editor.isActive('italic')
@@ -1611,6 +1617,23 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     if (sizeAttrs?.fontSize) marks.fontSize = sizeAttrs.fontSize
     const hl = editor.getAttributes('highlight') as any
     if (hl?.color) marks.highlight = hl.color
+
+    // 2) 위에서 못 캡쳐된 값은 커서 위치 DOM 의 computed style 에서 보강
+    try {
+      const sel = window.getSelection()
+      const node = sel?.anchorNode
+      const el = (node && node.nodeType === 3 ? node.parentElement : node) as HTMLElement | null
+      if (el && editor.view.dom.contains(el)) {
+        const cs = window.getComputedStyle(el)
+        if (!marks.fontFamily && cs.fontFamily) marks.fontFamily = cs.fontFamily
+        if (!marks.fontSize && cs.fontSize) {
+          const px = parseFloat(cs.fontSize)
+          if (!isNaN(px)) marks.fontSize = `${Math.round(px * 0.75 * 10) / 10}pt`
+        }
+        if (!marks.color && cs.color && cs.color !== 'rgb(31, 41, 55)') marks.color = cs.color
+      }
+    } catch {}
+
     setPainterMarks(marks)
     setPainterMode(true)
   }
@@ -1951,8 +1974,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </button>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => { setPainterLocked(false); togglePainter() }}
-                      onDoubleClick={() => { if (!painterMode) togglePainter(); setPainterLocked(true) }}
+                      onDoubleClick={(e) => { e.preventDefault(); if (!painterMode) togglePainter(); setPainterLocked(true) }}
                       className={`word-btn-small ${painterMode ? 'word-btn-active' : ''}`}
                       title="서식 복사 (더블클릭하면 여러 번 적용 가능, ESC 로 해제)"
                     >
