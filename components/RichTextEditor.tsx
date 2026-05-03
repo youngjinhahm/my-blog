@@ -1067,13 +1067,16 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     const rect = img.getBoundingClientRect()
     const editorRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
       || editor.view.dom.getBoundingClientRect()
-    // 툴바를 이미지 바로 아래(파란 리사이즈 핸들 박스 밑)에 붙임
+    // 툴바는 .editor-page 안의 absolute 자식인데, 부모는 CSS zoom 으로 스케일됨.
+    // getBoundingClientRect 는 뷰포트 좌표(스케일 후)를 돌려주므로,
+    // top/left 를 zoom 으로 나눠줘야 줌 배율과 무관하게 이미지 바로 아래에 정확히 붙음.
+    const z = (zoomLevel || 100) / 100
     setImageToolbarPos({
-      top: rect.bottom - editorRect.top + 6,
-      left: rect.left - editorRect.left + rect.width / 2,
+      top: (rect.bottom - editorRect.top) / z + 6,
+      left: (rect.left - editorRect.left + rect.width / 2) / z,
     })
     setShowImageToolbar(true)
-  }, [isImageSelected, editor?.state.selection])
+  }, [isImageSelected, editor?.state.selection, zoomLevel])
 
   // 이미지 편집 함수들
   const setImageSize = (widthPercent: number) => {
