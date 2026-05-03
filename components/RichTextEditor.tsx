@@ -686,6 +686,56 @@ const ResizableImage = Image.extend({
   },
 })
 
+// 글꼴 드롭다운에 등록된 모든 value (현재 적용된 글꼴이 목록에 없으면 동적 옵션 추가용)
+const KNOWN_FONT_VALUES = new Set<string>([
+  "'Times New Roman', Times, serif",
+  "'맑은 고딕', 'Malgun Gothic', sans-serif",
+  "'Noto Sans KR', sans-serif",
+  "'Noto Serif KR', serif",
+  "'Nanum Gothic', sans-serif",
+  "'Nanum Myeongjo', serif",
+  "'Nanum Pen Script', cursive",
+  "'Gowun Dodum', sans-serif",
+  "'Jua', sans-serif",
+  "'Do Hyeon', sans-serif",
+  "'Black Han Sans', sans-serif",
+  "'바탕', Batang, serif",
+  "'굴림', Gulim, sans-serif",
+  "'돋움', Dotum, sans-serif",
+  "'궁서', Gungsuh, serif",
+  "Georgia, serif",
+  "'Cambria', Georgia, serif",
+  "Garamond, 'Times New Roman', serif",
+  "'Book Antiqua', 'Palatino Linotype', serif",
+  "'Baskerville', serif",
+  "'Playfair Display', serif",
+  "'Merriweather', serif",
+  "Arial, Helvetica, sans-serif",
+  "'Arial Black', sans-serif",
+  "'Arial Narrow', sans-serif",
+  "Helvetica, sans-serif",
+  "Calibri, sans-serif",
+  "'Segoe UI', sans-serif",
+  "Tahoma, sans-serif",
+  "Verdana, sans-serif",
+  "'Trebuchet MS', sans-serif",
+  "'Century Gothic', sans-serif",
+  "'Gill Sans', sans-serif",
+  "'Roboto', sans-serif",
+  "'Open Sans', sans-serif",
+  "'Lato', sans-serif",
+  "'Montserrat', sans-serif",
+  "'Inter', sans-serif",
+  "'Courier New', monospace",
+  "Consolas, monospace",
+  "Monaco, monospace",
+  "'JetBrains Mono', monospace",
+])
+function getFontDisplayName(value: string): string {
+  const m = value.match(/^'([^']+)'/) || value.match(/^([^,]+)/)
+  return m ? m[1].trim() : value
+}
+
 interface RichTextEditorProps {
   content: string
   onChange: (content: string) => void
@@ -741,6 +791,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [charCount, setCharCount] = useState(0)
+  // 커서/선택 위치의 실제 글꼴·크기 (리본 드롭다운에 표시)
+  const [currentFontFamily, setCurrentFontFamily] = useState<string>('')
+  const [currentFontSize, setCurrentFontSize] = useState<string>('')
 
   const [showInsertGrid, setShowInsertGrid] = useState(false)
   const [hoverRow, setHoverRow] = useState(0)
@@ -1105,6 +1158,21 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, pageSize, pageOrientation, pageMargins])
 
+  // 커서 위치/선택 변경 시 현재 글꼴·크기를 리본 드롭다운에 반영
+  useEffect(() => {
+    if (!editor) return
+    const readFontInfo = () => {
+      const styleAttrs = editor.getAttributes('textStyle') as any
+      const sizeAttrs = editor.getAttributes('fontSize') as any
+      setCurrentFontFamily(styleAttrs?.fontFamily || '')
+      setCurrentFontSize(sizeAttrs?.fontSize || '')
+    }
+    readFontInfo()
+    const u1 = editor.on('selectionUpdate', readFontInfo)
+    const u2 = editor.on('transaction', readFontInfo)
+    return () => { try { (u1 as any)?.(); (u2 as any)?.() } catch {} }
+  }, [editor])
+
 
   // 현재 선택이 속한 표 노드와 위치를 찾음
   const findEnclosingTable = (): { node: any; pos: number } | null => {
@@ -1456,7 +1524,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }
 
   // 글자 크기 증가/감소 (현재 선택된 범위의 fontSize mark 를 pt 기준으로 조절)
-  const FONT_SIZE_STEPS = [8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72]
+  const FONT_SIZE_STEPS = [8,9,10,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72]
   const stepFontSize = (dir: 1 | -1) => {
     if (!editor) return
     const attrs: any = editor.getAttributes('fontSize') || {}
@@ -1848,8 +1916,13 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               <div className="word-group">
                 <div className="word-group-body word-font-body">
                   <div className="word-row">
-                    <select onChange={handleFontFamilyChange} className="word-font-select" defaultValue="">
+                    <select onChange={handleFontFamilyChange} className="word-font-select" value={currentFontFamily}>
+                      {/* 빈 값(마크 없음) → 베이스 CSS 기본 = Times New Roman */}
                       <option value="">Times New Roman</option>
+                      {/* 표준 목록에 없는 글꼴이면 동적 옵션 추가 */}
+                      {!!currentFontFamily && !KNOWN_FONT_VALUES.has(currentFontFamily) && (
+                        <option value={currentFontFamily}>{getFontDisplayName(currentFontFamily)}</option>
+                      )}
                       <optgroup label="최근 사용">
                         <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
                         <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕 (Body)</option>
@@ -1913,9 +1986,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                         <option value="'Brush Script MT', cursive" style={{ fontFamily: "'Brush Script MT'" }}>Brush Script</option>
                       </optgroup>
                     </select>
-                    <select onChange={handleFontSizeChange} className="word-size-select" defaultValue="">
-                      <option value="" disabled>10</option>
-                      {[8,9,10,10.5,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(s => <option key={s} value={`${s}pt`}>{s}</option>)}
+                    <select onChange={handleFontSizeChange} className="word-size-select" value={currentFontSize || '10pt'}>
+                      {/* 적용된 크기가 표준 목록에 없으면 동적 옵션 추가 (예: Ctrl+]/[ 로 11pt 등) */}
+                      {!!currentFontSize && ![8,9,10,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(n => `${n}pt`).includes(currentFontSize) && (
+                        <option value={currentFontSize}>{currentFontSize.replace('pt','')}</option>
+                      )}
+                      {[8,9,10,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(sz => <option key={sz} value={`${sz}pt`}>{sz}</option>)}
                     </select>
                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(1)} className="word-btn-mini" title="글자 크기 크게">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="17" fontFamily="Arial" fontSize="16" fontWeight="700">A</text><text x="14" y="9" fontFamily="Arial" fontSize="9" fontWeight="700">^</text></svg>
