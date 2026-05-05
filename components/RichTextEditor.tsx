@@ -99,6 +99,23 @@ const StyledTableHeader = TableHeader.extend({
     }
   },
 })
+
+// 표 행 높이 드래그 — Word 처럼 행의 아래 테두리를 잡아 끌어 높이 조절
+const StyledTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      height: {
+        default: null as string | null,
+        parseHTML: (element: HTMLElement) => (element as HTMLElement).style.height || null,
+        renderHTML: (attributes: any) => {
+          if (!attributes.height) return {}
+          return { style: `height: ${attributes.height}` }
+        },
+      },
+    }
+  },
+})
 import { useRef, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
@@ -853,7 +870,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       StyledTable.configure({
         resizable: true,
       }),
-      TableRow,
+      StyledTableRow,
       StyledTableHeader,
       StyledTableCell,
       PageBreak,
@@ -1216,6 +1233,82 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     return () => { try { dom.removeEventListener('mouseup', onMouseUp, true) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
+
+  // 표 행 높이 드래그 — 행의 아래 테두리 근처에서 mousedown → drag → mouseup
+  useEffect(() => {
+    if (!editor) return
+    const root = editor.view.dom as HTMLElement
+    const ZONE = 6 // px — 드래그 가능한 영역의 높이
+    let dragging: { tr: HTMLTableRowElement; startY: number; startH: number } | null = null
+
+    const findRowResizeTarget = (e: MouseEvent): HTMLTableRowElement | null => {
+      const target = e.target as HTMLElement | null
+      if (!target) return null
+      const tr = target.closest('tr') as HTMLTableRowElement | null
+      if (!tr || !root.contains(tr)) return null
+      const rect = tr.getBoundingClientRect()
+      if (e.clientY > rect.bottom - ZONE && e.clientY <= rect.bottom + ZONE) {
+        return tr
+      }
+      return null
+    }
+
+    const onMove = (e: MouseEvent) => {
+      // 마우스 호버 시 커서 변경
+      if (!dragging) {
+        const tr = findRowResizeTarget(e)
+        root.style.cursor = tr ? 'row-resize' : ''
+        return
+      }
+      // 드래그 중 — 높이 갱신
+      const newH = Math.max(20, dragging.startH + (e.clientY - dragging.startY))
+      dragging.tr.style.height = `${newH}px`
+    }
+
+    const onDown = (e: MouseEvent) => {
+      const tr = findRowResizeTarget(e)
+      if (!tr) return
+      e.preventDefault()
+      e.stopPropagation()
+      dragging = {
+        tr,
+        startY: e.clientY,
+        startH: tr.getBoundingClientRect().height,
+      }
+      document.body.style.userSelect = 'none'
+    }
+
+    const onUp = () => {
+      if (!dragging) return
+      const tr = dragging.tr
+      const finalH = tr.style.height || `${tr.getBoundingClientRect().height}px`
+      // ProseMirror 트랜잭션으로 height 속성을 영속화 → 저장 시 HTML 에 함께 반영
+      try {
+        const view = editor.view
+        const pos = view.posAtDOM(tr, 0)
+        const $pos = view.state.doc.resolve(pos)
+        for (let d = $pos.depth; d > 0; d--) {
+          const node = $pos.node(d)
+          if (node.type.name === 'tableRow') {
+            const trPos = $pos.before(d)
+            view.dispatch(view.state.tr.setNodeMarkup(trPos, undefined, { ...node.attrs, height: finalH }))
+            break
+          }
+        }
+      } catch {}
+      dragging = null
+      document.body.style.userSelect = ''
+    }
+
+    root.addEventListener('mousedown', onDown)
+    root.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      root.removeEventListener('mousedown', onDown)
+      root.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [editor])
 
 
   // 현재 선택이 속한 표 노드와 위치를 찾음
@@ -3753,10 +3846,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           pointer-events: none;
         }
 
-        /* Word Table Styles 프리셋 */
+        /* Word Table Styles 프리셋 — 기본은 검은 선(Word 기본) */
         .ProseMirror table.tbl-grid td,
         .ProseMirror table.tbl-grid th {
-          border: 1px solid #9ca3af;
+          border: 1px solid #000000;
         }
         .ProseMirror table.tbl-grid th {
           background-color: #f3f4f6;

@@ -92,7 +92,7 @@
   vertical-align: top;
 }
 .prose table.tbl-grid td,
-.prose table.tbl-grid th { border: 1px solid #9ca3af; }
+.prose table.tbl-grid th { border: 1px solid #000000; }
 .prose table.tbl-grid th { background-color: #f3f4f6; font-weight: 700; }
 
 .prose table.tbl-plain td,
