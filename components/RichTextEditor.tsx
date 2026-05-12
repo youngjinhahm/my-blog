@@ -3522,14 +3522,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           outline: none;
           font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif !important;
           font-size: 10pt !important;
-          line-height: 1.0 !important;
+          line-height: 1.15 !important;
           color: #1f2937;
         }
         /* p/h/li 도 명시적으로 → 컨테이너의 .prose 잔여물에서 살아남도록 */
         .ProseMirror p,
         .ProseMirror li {
           font-size: 10pt;
-          line-height: 1.0;
+          line-height: 1.15;
         }
         /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
         .ProseMirror p,
