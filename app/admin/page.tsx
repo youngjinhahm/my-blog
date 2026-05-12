@@ -374,6 +374,9 @@ export default function AdminPage() {
       category: '경제'
     })
     setShowForm(true)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   // 임시저장 리스트에서 하나 열기
@@ -404,6 +407,9 @@ export default function AdminPage() {
     })
     setShowDraftList(false)
     setShowForm(true)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   // 임시저장 하나 삭제 (클라우드 + 캐시)
@@ -474,6 +480,10 @@ export default function AdminPage() {
       category: post.category
     })
     setShowForm(true)
+    // 폼이 페이지 위쪽에 있으니 자동 스크롤 — 수정 누른 글이 바로 보이게
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   // 수동 임시 저장 (버튼 클릭) — Supabase 에 저장하여 다른 기기에서도 이어쓰기 가능

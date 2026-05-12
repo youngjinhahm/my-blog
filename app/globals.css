@@ -332,3 +332,7 @@
   /* 빈 단락도 한 줄 높이 유지 (margin: 0 인 상태에서도 시각적 빈 줄 보이게) */
   min-height: 1.5em;
 }
+/* 빈 단락(<p></p>) 강제 표시 — invisible nbsp 로 라인 박스 강제 생성 */
+.post-content > p:empty::before {
+  content: '\00a0';
+}
