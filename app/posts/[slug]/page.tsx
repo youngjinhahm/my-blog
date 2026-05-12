@@ -93,21 +93,9 @@ export default async function PostPage({
             )}
           </div>
 
-          {/* 본문 */}
+          {/* 본문 — 에디터와 동일한 글꼴/크기/줄간격으로 렌더 */}
           <div
-            className="prose prose-base sm:prose-lg max-w-none
-              prose-headings:font-bold
-              prose-h1:text-xl sm:prose-h1:text-3xl
-              prose-h2:text-lg sm:prose-h2:text-2xl
-              prose-h3:text-base sm:prose-h3:text-xl
-              prose-p:text-gray-700 prose-p:leading-relaxed
-              prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-              prose-img:rounded-lg prose-img:mx-auto prose-img:my-4
-              prose-pre:bg-gray-900 prose-pre:text-gray-100
-              prose-code:text-sm prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-              prose-ul:my-4 prose-ol:my-4
-              prose-li:my-1
-              break-words"
+            className="post-content break-words"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
 

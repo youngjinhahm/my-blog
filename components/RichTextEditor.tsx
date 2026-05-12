@@ -887,6 +887,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showChartDialog, setShowChartDialog] = useState(false)
   const [showImageToolbar, setShowImageToolbar] = useState(false)
   const [imageToolbarPos, setImageToolbarPos] = useState({ top: 0, left: 0 })
+  const [tableToolbarPos, setTableToolbarPos] = useState<{ top: number; left: number; show: boolean }>({ top: 0, left: 0, show: false })
   const replaceImageRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
@@ -1301,6 +1302,36 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     return () => { try { dom.removeEventListener('mouseup', onMouseUp, true) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
+
+  // 표 셀에 커서가 있으면 표 상단에 플로팅 툴바 표시 (Word 스타일)
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      if (!editor.isActive('table')) {
+        setTableToolbarPos(p => p.show ? { ...p, show: false } : p)
+        return
+      }
+      // 현재 selection 의 위치에서 가장 가까운 <table> DOM 찾기
+      const dom = editor.view.nodeDOM(editor.state.selection.from) as HTMLElement | null
+      const tableEl = (dom?.closest && dom.closest('table')) as HTMLElement | null
+      if (!tableEl) { setTableToolbarPos(p => p.show ? { ...p, show: false } : p); return }
+      const tableRect = tableEl.getBoundingClientRect()
+      const pageRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect() || editor.view.dom.getBoundingClientRect()
+      const z = (zoomLevel || 100) / 100
+      setTableToolbarPos({
+        top: (tableRect.top - pageRect.top) / z - 38,
+        left: (tableRect.left - pageRect.left + tableRect.width / 2) / z,
+        show: true,
+      })
+    }
+    update()
+    editor.on('selectionUpdate', update)
+    editor.on('transaction', update)
+    return () => {
+      try { editor.off('selectionUpdate', update); editor.off('transaction', update) } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, zoomLevel])
 
   // 헤딩(H1~H3) 스캔 → 개요 패널
   useEffect(() => {
@@ -3354,6 +3385,47 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           }}
         >
           <EditorContent editor={editor} />
+          {/* 표 셀에 커서 있을 때 표 상단 플로팅 툴바 (Word 스타일) */}
+          {tableToolbarPos.show && (
+            <div
+              className="absolute z-30 flex items-center gap-0.5 bg-white border border-gray-300 rounded-lg shadow-lg px-1.5 py-1"
+              style={{ top: `${tableToolbarPos.top}px`, left: `${tableToolbarPos.left}px`, transform: 'translateX(-50%)' }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="위에 행 추가">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="1"/><line x1="6" y1="2" x2="10" y2="2" stroke="#2563eb" strokeWidth="2"/><line x1="8" y1="0" x2="8" y2="4" stroke="#2563eb" strokeWidth="2"/></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="아래에 행 추가">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="7" x2="15" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="6" y1="14" x2="10" y2="14" stroke="#2563eb" strokeWidth="2"/><line x1="8" y1="12" x2="8" y2="16" stroke="#2563eb" strokeWidth="2"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="왼쪽에 열 추가">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="1" width="10" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="9" y1="1" x2="9" y2="15" stroke="currentColor" strokeWidth="1"/><line x1="2" y1="6" x2="2" y2="10" stroke="#2563eb" strokeWidth="2"/><line x1="0" y1="8" x2="4" y2="8" stroke="#2563eb" strokeWidth="2"/></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="오른쪽에 열 추가">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="10" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="7" y1="1" x2="7" y2="15" stroke="currentColor" strokeWidth="1"/><line x1="14" y1="6" x2="14" y2="10" stroke="#2563eb" strokeWidth="2"/><line x1="12" y1="8" x2="16" y2="8" stroke="#2563eb" strokeWidth="2"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="p-1.5 hover:bg-red-50 rounded text-red-600" title="행 삭제">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="6" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="p-1.5 hover:bg-red-50 rounded text-red-600" title="열 삭제">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="1" width="6" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => editor.chain().focus().mergeCells().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 병합">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2"/></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().splitCell().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 분할">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" strokeWidth="1"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => { if (confirm('표 전체를 삭제할까요?')) editor.chain().focus().deleteTable().run() }} className="p-1.5 hover:bg-red-50 rounded text-red-600" title="표 삭제">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1"/><line x1="6" y1="2" x2="6" y2="14" stroke="currentColor" strokeWidth="1"/><line x1="3" y1="9" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="13" x2="13" y2="9" stroke="currentColor" strokeWidth="1.5"/></svg>
+              </button>
+            </div>
+          )}
+
           {/* 이미지 선택 시 플로팅 툴바 */}
           {showImageToolbar && isImageSelected && (
             <div
