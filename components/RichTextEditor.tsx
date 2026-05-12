@@ -4718,20 +4718,24 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           width: 100%;
           table-layout: fixed;
         }
-        /* 표 자체 정렬 — center/right 일 때만 width: fit-content 로 좁혀 정렬 효과가 보이게 */
+        /* 표 자체 정렬 — Word 처럼. 기본 width: 100% / colwidth 인라인 스타일을 이기기 위해 !important 필요 */
+        .ProseMirror table[data-align="center"],
+        .ProseMirror table[data-align="right"],
+        .ProseMirror table[data-align="left"] {
+          width: auto !important;
+          table-layout: auto !important;
+        }
         .ProseMirror table[data-align="center"] {
-          margin-left: auto;
-          margin-right: auto;
-          width: fit-content;
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
         .ProseMirror table[data-align="right"] {
-          margin-left: auto;
-          margin-right: 0;
-          width: fit-content;
+          margin-left: auto !important;
+          margin-right: 0 !important;
         }
         .ProseMirror table[data-align="left"] {
-          margin-left: 0;
-          margin-right: auto;
+          margin-left: 0 !important;
+          margin-right: auto !important;
         }
         .ProseMirror table td,
         .ProseMirror table th {
