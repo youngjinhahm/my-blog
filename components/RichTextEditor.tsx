@@ -17,6 +17,9 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { common, createLowlight } from 'lowlight'
+const lowlight = createLowlight(common)
 import { Mark, Node, Extension, textInputRule } from '@tiptap/core'
 import { CellSelection, TableMap } from '@tiptap/pm/tables'
 import { NodeSelection } from '@tiptap/pm/state'
@@ -858,6 +861,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showColumnsMenu, setShowColumnsMenu] = useState(false)
   const [showBreaksMenu, setShowBreaksMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showOutline, setShowOutline] = useState(false)
+  const [outline, setOutline] = useState<Array<{ level: number; text: string; pos: number }>>([])
   const [zoomLevel, setZoomLevel] = useState(120)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -888,14 +893,14 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        hardBreak: {
-          keepMarks: false,
-        },
-        paragraph: {
-          HTMLAttributes: {
-            class: 'my-0',
-          },
-        },
+        hardBreak: { keepMarks: false },
+        paragraph: { HTMLAttributes: { class: 'my-0' } },
+        codeBlock: false,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: null,
+        HTMLAttributes: { class: 'code-block' },
       }),
       Underline,
       FontSize,
@@ -1296,6 +1301,32 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     return () => { try { dom.removeEventListener('mouseup', onMouseUp, true) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
+
+  // 헤딩(H1~H3) 스캔 → 개요 패널
+  useEffect(() => {
+    if (!editor) return
+    const recompute = () => {
+      const items: Array<{ level: number; text: string; pos: number }> = []
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'heading' && node.attrs.level <= 3) {
+          items.push({ level: node.attrs.level, text: node.textContent || '(빈 제목)', pos })
+        }
+        return true
+      })
+      setOutline(items)
+    }
+    recompute()
+    editor.on('update', recompute)
+    return () => { try { editor.off('update', recompute) } catch {} }
+  }, [editor])
+
+  const jumpToHeading = (pos: number) => {
+    if (!editor) return
+    editor.commands.focus()
+    editor.commands.setTextSelection(pos)
+    const dom = (editor.view as any).nodeDOM(pos) as HTMLElement | null
+    if (dom && (dom as any).scrollIntoView) (dom as any).scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   // 표 행 높이 드래그 — 행의 아래 테두리 근처에서 mousedown → drag → mouseup
   useEffect(() => {
@@ -2074,6 +2105,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           <div className="flex-1 text-center text-[12px] text-white/95 font-normal tracking-wide truncate">문서 1 — Word</div>
 
           <div className="flex items-center gap-1 ml-3">
+            <button type="button" onClick={() => setShowOutline(v => !v)} className={`word-titlebar-btn ${showOutline ? 'word-btn-active' : ''}`} title="개요 (탐색 창)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="1.8"/><line x1="7" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1.6"/><line x1="10" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="1.4"/></svg>
+            </button>
             <button type="button" onClick={() => setShowHelp(true)} className="word-titlebar-btn" title="단축키 도움말 (Ctrl+/)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/><path d="M9.5 9a2.5 2.5 0 015 0c0 1.3-1 1.7-1.7 2.2-.6.4-.8 1-.8 1.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none"/><circle cx="12" cy="17" r="0.9" fill="currentColor"/></svg>
             </button>
@@ -3260,6 +3294,41 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         </div>
       )}
 
+      {/* 에디터 영역 — 좌측 개요 패널 + A4 캔버스 */}
+      <div className="editor-area">
+        {showOutline && (
+          <aside className="editor-outline">
+            <div className="editor-outline-header">
+              <span>개요</span>
+              <button type="button" onClick={() => setShowOutline(false)} className="text-gray-500 hover:text-gray-900 text-lg leading-none">×</button>
+            </div>
+            <div className="editor-outline-body">
+              {outline.length === 0 ? (
+                <div className="text-xs text-gray-400 px-2 py-3">
+                  본문에 제목(H1~H3)을 추가하면<br />이곳에 자동 표시됩니다.<br /><br />
+                  <span className="text-gray-500">팁: <kbd className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">## 제목</kbd> 입력 후 공백을 누르면 H2 가 됩니다.</span>
+                </div>
+              ) : (
+                <ul className="space-y-0.5">
+                  {outline.map((item, i) => (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        onClick={() => jumpToHeading(item.pos)}
+                        className={`w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-gray-800 truncate text-sm leading-tight outline-h${item.level}`}
+                        style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
+                        title={item.text}
+                      >
+                        {item.text}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside>
+        )}
+
       {/* 에디터 (A4 페이지 레이아웃 + 줌 + 페이지 구분) */}
       <div className={isFullscreen ? 'editor-canvas editor-canvas-fullscreen' : 'editor-canvas editor-canvas-normal'}>
         <div
@@ -3317,6 +3386,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         </div>
         </div>
       </div>
+      </div>{/* /editor-area */}
 
       {/* === Word 스타일 하단 상태바 (Status Bar) === */}
       <div className="word-statusbar">
@@ -3746,6 +3816,42 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .word-menu-item:hover { background: #e7e6e5; }
 
         /* === 캔버스 오버플로우 수정 === */
+        /* === 개요(탐색 창) 패널 === */
+        .editor-area {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: hidden;
+        }
+        .editor-outline {
+          width: 240px;
+          flex-shrink: 0;
+          background: #faf9f8;
+          border-right: 1px solid #e1dfdd;
+          display: flex;
+          flex-direction: column;
+          font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+        }
+        .editor-outline-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #323130;
+          background: #f3f2f1;
+          border-bottom: 1px solid #e1dfdd;
+        }
+        .editor-outline-body {
+          flex: 1 1 auto;
+          overflow-y: auto;
+          padding: 6px 4px;
+        }
+        .editor-outline .outline-h1 { font-weight: 600; color: #2b579a; }
+        .editor-outline .outline-h2 { font-weight: 500; color: #323130; }
+        .editor-outline .outline-h3 { color: #605e5c; }
+
         .editor-canvas-normal {
           flex: 1 1 auto;
           min-height: 0;
@@ -3977,6 +4083,53 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           display: block;
           margin: 0;
         }
+        /* 코드 블록 (CodeBlockLowlight + lowlight) */
+        .ProseMirror pre.code-block,
+        .ProseMirror pre {
+          background: #0f172a;
+          color: #e5e7eb;
+          padding: 14px 16px;
+          border-radius: 6px;
+          margin: 14px 0;
+          font-family: 'Consolas', 'Monaco', 'JetBrains Mono', monospace;
+          font-size: 13px;
+          line-height: 1.5;
+          overflow-x: auto;
+          break-inside: avoid;
+        }
+        .ProseMirror pre code { background: transparent; padding: 0; color: inherit; }
+        .ProseMirror code {
+          background: #f1f5f9;
+          color: #be123c;
+          padding: 1px 5px;
+          border-radius: 3px;
+          font-family: 'Consolas', monospace;
+          font-size: 0.92em;
+        }
+        /* highlight.js github-dark 토큰 */
+        .ProseMirror pre .hljs-keyword,
+        .ProseMirror pre .hljs-built_in,
+        .ProseMirror pre .hljs-type,
+        .ProseMirror pre .hljs-literal { color: #f97583; }
+        .ProseMirror pre .hljs-string,
+        .ProseMirror pre .hljs-attr,
+        .ProseMirror pre .hljs-template-tag,
+        .ProseMirror pre .hljs-template-variable { color: #9ecbff; }
+        .ProseMirror pre .hljs-comment,
+        .ProseMirror pre .hljs-quote { color: #6a737d; font-style: italic; }
+        .ProseMirror pre .hljs-number,
+        .ProseMirror pre .hljs-symbol,
+        .ProseMirror pre .hljs-meta { color: #79b8ff; }
+        .ProseMirror pre .hljs-title,
+        .ProseMirror pre .hljs-section,
+        .ProseMirror pre .hljs-name,
+        .ProseMirror pre .hljs-selector-id,
+        .ProseMirror pre .hljs-selector-class { color: #b392f0; }
+        .ProseMirror pre .hljs-variable,
+        .ProseMirror pre .hljs-regexp { color: #ffab70; }
+        .ProseMirror pre .hljs-deletion { background: rgba(248,81,73,0.2); color: #fdaeb7; }
+        .ProseMirror pre .hljs-addition { background: rgba(46,160,67,0.2); color: #85e89d; }
+
         /* 기본 표 스타일 */
         .ProseMirror table {
           border-collapse: collapse;

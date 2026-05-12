@@ -162,3 +162,32 @@
 .content p:has(> img[data-align="right"]) { text-align: right; }
 .prose p:has(> img[data-align="left"]),
 .content p:has(> img[data-align="left"]) { text-align: left; }
+
+/* === 코드 블록 (공개 페이지) === */
+.prose pre {
+  background: #0f172a !important;
+  color: #e5e7eb !important;
+  padding: 14px 16px;
+  border-radius: 6px;
+  margin: 14px 0;
+  font-family: 'Consolas', 'Monaco', 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.prose pre code { background: transparent !important; color: inherit !important; padding: 0; }
+.prose pre .hljs-keyword,
+.prose pre .hljs-built_in,
+.prose pre .hljs-type,
+.prose pre .hljs-literal { color: #f97583; }
+.prose pre .hljs-string,
+.prose pre .hljs-attr { color: #9ecbff; }
+.prose pre .hljs-comment { color: #6a737d; font-style: italic; }
+.prose pre .hljs-number,
+.prose pre .hljs-symbol,
+.prose pre .hljs-meta { color: #79b8ff; }
+.prose pre .hljs-title,
+.prose pre .hljs-section,
+.prose pre .hljs-name { color: #b392f0; }
+.prose pre .hljs-variable,
+.prose pre .hljs-regexp { color: #ffab70; }

@@ -126,6 +126,15 @@ export default function HomeContent({ posts, settings }: HomeContentProps) {
                 >
                   <Link href={`/posts/${post.slug}`}>
                     <div className="group">
+                      {(post as any).featured_image_url && (
+                        <div className="mb-3 overflow-hidden rounded-lg">
+                          <img
+                            src={(post as any).featured_image_url}
+                            alt={post.title}
+                            className="w-full h-40 sm:h-56 object-cover group-hover:scale-105 transition duration-300"
+                          />
+                        </div>
+                      )}
                       <time className="text-xs sm:text-sm font-medium text-gray-500 block mb-2 sm:mb-3">
                         {new Date(post.created_at)
                           .toLocaleDateString('en-US', {

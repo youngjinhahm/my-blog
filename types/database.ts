@@ -8,6 +8,7 @@ export interface Post {
   excerpt: string | null
   published: boolean
   is_private: boolean  // 비밀글: true면 외부 조회 불가, 관리자만 볼 수 있음
+  featured_image_url: string | null  // 대표 이미지 (글 목록 카드/SNS 공유용)
   author_id: string | null
   category: string
   views: number  // 이 줄 추가

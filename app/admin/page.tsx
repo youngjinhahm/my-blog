@@ -24,8 +24,10 @@ export default function AdminPage() {
     excerpt: '',
     published: false,
     is_private: false,
+    featured_image_url: '' as string,
     category: '경제' as string
   })
+  const [uploadingFeatured, setUploadingFeatured] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
 
@@ -62,6 +64,7 @@ export default function AdminPage() {
     excerpt: string
     published: boolean
     is_private: boolean
+    featured_image_url?: string
     category: string
     savedAt: string
     editingPostId?: string | null
@@ -101,6 +104,7 @@ export default function AdminPage() {
     excerpt: r.excerpt || '',
     published: !!r.published,
     is_private: !!r.is_private,
+    featured_image_url: r.featured_image_url || '',
     category: r.category || '경제',
     savedAt: r.saved_at,
     editingPostId: r.editing_post_id || null,
@@ -137,6 +141,7 @@ export default function AdminPage() {
       content: payload.content,
       excerpt: payload.excerpt,
       is_private: payload.is_private,
+      featured_image_url: payload.featured_image_url || null,
       category: payload.category,
       editing_post_id: payload.editingPostId || null,
       saved_at: payload.savedAt,
@@ -224,6 +229,7 @@ export default function AdminPage() {
         excerpt: formData.excerpt,
         published: formData.published,
         is_private: formData.is_private,
+        featured_image_url: formData.featured_image_url,
         category: formData.category,
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
@@ -348,6 +354,7 @@ export default function AdminPage() {
       excerpt: '',
       published: false,
       is_private: false,
+      featured_image_url: '',
       category: '경제'
     })
     setShowForm(true)
@@ -376,6 +383,7 @@ export default function AdminPage() {
       excerpt: d.excerpt || '',
       published: !!d.published,
       is_private: !!d.is_private,
+      featured_image_url: d.featured_image_url || '',
       category: d.category || '경제',
     })
     setShowDraftList(false)
@@ -427,6 +435,7 @@ export default function AdminPage() {
               excerpt: draft.excerpt || post.excerpt || '',
               published: draft.published ?? post.published,
               is_private: draft.is_private ?? (post as any).is_private ?? false,
+              featured_image_url: draft.featured_image_url || (post as any).featured_image_url || '',
               category: draft.category || post.category,
             })
             setShowForm(true)
@@ -445,6 +454,7 @@ export default function AdminPage() {
       excerpt: post.excerpt || '',
       published: post.published,
       is_private: (post as any).is_private || false,
+      featured_image_url: (post as any).featured_image_url || '',
       category: post.category
     })
     setShowForm(true)
@@ -463,6 +473,7 @@ export default function AdminPage() {
         excerpt: formData.excerpt,
         published: formData.published,
         is_private: formData.is_private,
+        featured_image_url: formData.featured_image_url,
         category: formData.category,
         savedAt: new Date().toISOString(),
         editingPostId: editingPost?.id || null,
@@ -536,6 +547,23 @@ export default function AdminPage() {
     return err.code === '23505' || msg.includes('posts_slug_key') || (msg.includes('duplicate') && msg.includes('slug'))
   }
 
+  async function handleFeaturedImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingFeatured(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `featured-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from('blog-images').upload(fileName, file)
+      if (uploadError) { alert('대표 이미지 업로드 실패: ' + uploadError.message); return }
+      const { data: { publicUrl } } = supabase.storage.from('blog-images').getPublicUrl(fileName)
+      setFormData(fd => ({ ...fd, featured_image_url: publicUrl }))
+    } finally {
+      setUploadingFeatured(false)
+      e.target.value = ''
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     
@@ -549,6 +577,7 @@ export default function AdminPage() {
           excerpt: formData.excerpt || extractExcerpt(formData.content) || null,
           published: true,
           is_private: formData.is_private,
+          featured_image_url: formData.featured_image_url || null,
           category: formData.category,
           updated_at: new Date().toISOString()
         })
@@ -583,6 +612,7 @@ export default function AdminPage() {
           excerpt: formData.excerpt || extractExcerpt(formData.content) || null,
           published: true,
           is_private: formData.is_private,
+          featured_image_url: formData.featured_image_url || null,
           category: formData.category,
           author_id: user.id
         }])
@@ -736,6 +766,35 @@ export default function AdminPage() {
                   rows={2}
                   placeholder={formData.content ? extractExcerpt(formData.content) || '비워두면 본문에서 자동 생성' : '비워두면 본문에서 자동 생성'}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  대표 이미지 (글 목록 카드/SNS 공유용)
+                </label>
+                <div className="flex items-start gap-4">
+                  {formData.featured_image_url ? (
+                    <div className="relative">
+                      <img src={formData.featured_image_url} alt="대표 이미지" className="w-40 h-28 object-cover rounded-lg border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setFormData(fd => ({ ...fd, featured_image_url: '' }))}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 shadow"
+                        title="대표 이미지 제거"
+                      >×</button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center w-40 h-28 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition">
+                      <span className="text-xs text-gray-500">{uploadingFeatured ? '업로드 중...' : '이미지 선택'}</span>
+                      <span className="text-[10px] text-gray-400 mt-1">(클릭)</span>
+                      <input type="file" accept="image/*" onChange={handleFeaturedImageUpload} className="hidden" disabled={uploadingFeatured} />
+                    </label>
+                  )}
+                  <div className="flex-1 text-xs text-gray-500 leading-relaxed">
+                    글 목록 페이지와 SNS 공유 시 표시될 이미지입니다.<br />
+                    설정하지 않으면 본문의 첫 이미지를 자동으로 사용하거나 표시하지 않습니다.
+                  </div>
+                </div>
               </div>
 
               <div>
