@@ -329,4 +329,6 @@
 /* === 사용자가 입력한 공백 보존 (단락 시작 스페이스 등) === */
 .post-content > p {
   white-space: pre-wrap;
+  /* 빈 단락도 한 줄 높이 유지 (margin: 0 인 상태에서도 시각적 빈 줄 보이게) */
+  min-height: 1.15em;
 }
