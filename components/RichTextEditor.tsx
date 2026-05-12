@@ -948,9 +948,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editorProps: {
       attributes: {
         class: 'max-w-none focus:outline-none min-h-[26cm]',
-        // 브라우저 맞춤법 검사 비활성화 — agentic / hyperscaler 같은 기술 용어에 빨간줄이
-        // 자꾸 뜨는 문제 해결. (운영체제 사전에 단어를 직접 추가할 방법이 웹 표준에 없음)
-        spellcheck: 'false',
+        spellcheck: 'true',
+        // 한/영 혼용 본문이라 lang 을 지정하지 않음 — 브라우저가 자동 감지
       },
       handleKeyDown: (view, event) => {
         // Ctrl+F = Find
@@ -4132,3 +4131,4 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     </div>
   )
 }
+                                                                                                                                           
