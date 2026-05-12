@@ -636,8 +636,19 @@ const ResizableImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      // 너비 — 픽셀 단위 숫자. HTML 로 직렬화되어 저장/복원 라운드트립이 가능해야 함
       width: {
         default: null,
+        parseHTML: (el: HTMLElement) => {
+          const w = el.getAttribute('width') || (el as HTMLImageElement).style.width
+          if (!w) return null
+          const n = parseInt(String(w).replace('px', ''), 10)
+          return isNaN(n) ? null : n
+        },
+        renderHTML: (attrs: any) => {
+          if (!attrs.width) return {}
+          return { width: attrs.width, style: `width: ${attrs.width}px` }
+        },
       },
       align: {
         default: 'left',
