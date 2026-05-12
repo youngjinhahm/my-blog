@@ -2151,26 +2151,6 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }
 
 
-  // === MS Word 스타일 갤러리 — Live Preview 지원 ===
-  // hover 시 잠시 스타일 적용, mouseleave 시 원상복구
-  const stylePreviewSnap = useRef<any>(null)
-  const previewStyle = (style: string) => {
-    if (!editor) return
-    if (!stylePreviewSnap.current) {
-      stylePreviewSnap.current = editor.getJSON()
-    }
-    applyStyle(style)
-  }
-  const restorePreview = () => {
-    if (!editor || !stylePreviewSnap.current) return
-    editor.commands.setContent(stylePreviewSnap.current, { emitUpdate: false })
-    stylePreviewSnap.current = null
-  }
-  const commitPreview = () => {
-    // 클릭 시: 미리보기 상태를 그대로 유지 (스냅샷 비움)
-    stylePreviewSnap.current = null
-  }
-
   const applyStyle = (style: string) => {
     if (!editor) return
     const chain: any = editor.chain().focus()
@@ -2662,12 +2642,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               {/* ========== 스타일 그룹 (갤러리) ========== */}
               <div className="word-group">
                 <div className="word-group-body word-styles-body">
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('normal') }} onMouseEnter={() => previewStyle('normal')} onMouseLeave={restorePreview} className="word-style-card" title="표준"><span style={{ fontSize: 11 }}>표준</span></button>
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('h1') }} onMouseEnter={() => previewStyle('h1')} onMouseLeave={restorePreview} className="word-style-card" title="제목 1"><span style={{ fontSize: 14, fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('h2') }} onMouseEnter={() => previewStyle('h2')} onMouseLeave={restorePreview} className="word-style-card" title="제목 2"><span style={{ fontSize: 12, fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('title') }} onMouseEnter={() => previewStyle('title')} onMouseLeave={restorePreview} className="word-style-card" title="제목"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('subtitle') }} onMouseEnter={() => previewStyle('subtitle')} onMouseLeave={restorePreview} className="word-style-card" title="부제"><span style={{ fontSize: 11, fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
-                  <button type="button" onClick={() => { commitPreview(); applyStyle('quote') }} onMouseEnter={() => previewStyle('quote')} onMouseLeave={restorePreview} className="word-style-card" title="인용"><span style={{ fontSize: 11, fontStyle: 'italic' }}>"인용"</span></button>
+                  <button type="button" onClick={() => applyStyle('normal')} className="word-style-card" title="표준"><span style={{ fontSize: 11 }}>표준</span></button>
+                  <button type="button" onClick={() => applyStyle('h1')} className="word-style-card" title="제목 1"><span style={{ fontSize: 14, fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                  <button type="button" onClick={() => applyStyle('h2')} className="word-style-card" title="제목 2"><span style={{ fontSize: 12, fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                  <button type="button" onClick={() => applyStyle('title')} className="word-style-card" title="제목"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                  <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card" title="부제"><span style={{ fontSize: 11, fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                  <button type="button" onClick={() => applyStyle('quote')} className="word-style-card" title="인용"><span style={{ fontSize: 11, fontStyle: 'italic' }}>"인용"</span></button>
                   <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="word-style-more" title="더 보기">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 3l4 4 4-4z"/></svg>
                   </button>
@@ -2677,17 +2657,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   <div className="absolute top-full right-0 z-30 bg-white border border-[#c8c6c4] shadow-[0_4px_12px_rgba(0,0,0,0.18)] p-3 w-[480px] mt-0.5">
                     <div className="text-xs font-semibold text-[#323130] mb-2">스타일 갤러리</div>
                     <div className="grid grid-cols-4 gap-1.5">
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('normal') }} onMouseEnter={() => previewStyle('normal')} onMouseLeave={restorePreview} className="word-style-card-lg"><span>표준</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('title') }} onMouseEnter={() => previewStyle('title')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('subtitle') }} onMouseEnter={() => previewStyle('subtitle')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('h1') }} onMouseEnter={() => previewStyle('h1')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('h2') }} onMouseEnter={() => previewStyle('h2')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('h3') }} onMouseEnter={() => previewStyle('h3')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 3</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('h4') }} onMouseEnter={() => previewStyle('h4')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 4</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('strong') }} onMouseEnter={() => previewStyle('strong')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 700 }}>강조</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('emphasis') }} onMouseEnter={() => previewStyle('emphasis')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>기울임</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('quote') }} onMouseEnter={() => previewStyle('quote')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>인용</span></button>
-                      <button type="button" onClick={() => { commitPreview(); applyStyle('code') }} onMouseEnter={() => previewStyle('code')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontFamily: 'monospace' }}>코드</span></button>
+                      <button type="button" onClick={() => applyStyle('normal')} className="word-style-card-lg"><span>표준</span></button>
+                      <button type="button" onClick={() => applyStyle('title')} className="word-style-card-lg"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                      <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card-lg"><span style={{ fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                      <button type="button" onClick={() => applyStyle('h1')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                      <button type="button" onClick={() => applyStyle('h2')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                      <button type="button" onClick={() => applyStyle('h3')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 3</span></button>
+                      <button type="button" onClick={() => applyStyle('h4')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 4</span></button>
+                      <button type="button" onClick={() => applyStyle('strong')} className="word-style-card-lg"><span style={{ fontWeight: 700 }}>강조</span></button>
+                      <button type="button" onClick={() => applyStyle('emphasis')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>기울임</span></button>
+                      <button type="button" onClick={() => applyStyle('quote')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>인용</span></button>
+                      <button type="button" onClick={() => applyStyle('code')} className="word-style-card-lg"><span style={{ fontFamily: 'monospace' }}>코드</span></button>
                     </div>
                   </div>
                 )}
