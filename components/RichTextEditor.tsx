@@ -757,7 +757,18 @@ const ResizableImage = Image.extend({
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        
+
+        // 핸들을 잡는 순간 해당 이미지 노드를 선택 상태로 만든다
+        if (typeof getPos === 'function') {
+          try {
+            const pos = getPos()
+            if (typeof pos === 'number') {
+              const { state, view } = editor
+              view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)))
+            }
+          } catch {}
+        }
+
         isResizing = true
         startX = e.clientX
         startWidth = img.offsetWidth
@@ -774,9 +785,29 @@ const ResizableImage = Image.extend({
           if (isResizing) {
             isResizing = false
             const finalWidth = img.offsetWidth
-            
+
+            // setNodeMarkup 으로 위치를 명시해 노드 속성 갱신 — selection 상태에 의존하지 않음
             if (typeof getPos === 'function') {
-              editor.commands.updateAttributes('image', { width: finalWidth })
+              try {
+                const pos = getPos()
+                if (typeof pos === 'number') {
+                  const view = editor.view
+                  const $pos = view.state.doc.resolve(pos)
+                  const nodeAtPos = $pos.nodeAfter || view.state.doc.nodeAt(pos)
+                  if (nodeAtPos && nodeAtPos.type.name === 'image') {
+                    const tr = view.state.tr.setNodeMarkup(pos, undefined, {
+                      ...nodeAtPos.attrs,
+                      width: finalWidth,
+                    })
+                    view.dispatch(tr)
+                  } else {
+                    // fallback — selection 기반
+                    editor.commands.updateAttributes('image', { width: finalWidth })
+                  }
+                }
+              } catch (err) {
+                console.warn('이미지 크기 저장 실패:', err)
+              }
             }
           }
           
