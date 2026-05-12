@@ -3546,6 +3546,47 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin-bottom: 0;
         }
 
+        /* 제목 — .post-content 와 동일한 크기/굵기 (WYSIWYG) */
+        .ProseMirror h1 { font-size: 18pt; font-weight: 700; margin-top: 16px; line-height: 1.1; }
+        .ProseMirror h2 { font-size: 14pt; font-weight: 700; margin-top: 14px; line-height: 1.15; }
+        .ProseMirror h3 { font-size: 12pt; font-weight: 700; margin-top: 12px; line-height: 1.2; }
+        .ProseMirror h4 { font-size: 11pt; font-weight: 700; margin-top: 10px; line-height: 1.2; }
+        .ProseMirror h5 { font-size: 10pt; font-weight: 700; margin-top: 8px; line-height: 1.2; }
+        .ProseMirror h6 { font-size: 10pt; font-weight: 700; color: #6b7280; margin-top: 8px; line-height: 1.2; }
+
+        /* 목록 — 글머리 기호/번호 표시 */
+        .ProseMirror ul, .ProseMirror ol { padding-left: 1.6em !important; }
+        .ProseMirror ul { list-style-type: disc; }
+        .ProseMirror ol { list-style-type: decimal; }
+        .ProseMirror li { margin: 0 !important; }
+        .ProseMirror li > p { margin: 0 !important; }
+
+        /* 인용 */
+        .ProseMirror blockquote {
+          border-left: 4px solid #d1d5db;
+          padding-left: 12px;
+          color: #6b7280;
+          font-style: italic;
+          margin-top: 6px !important;
+          margin-bottom: 6px !important;
+        }
+
+        /* 링크 */
+        .ProseMirror a {
+          color: #2563eb;
+          text-decoration: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 2px;
+        }
+        .ProseMirror a:hover { color: #1d4ed8; }
+
+        /* 수평선 */
+        .ProseMirror hr {
+          border: none;
+          border-top: 1px solid #e5e7eb;
+          margin: 12px 0;
+        }
+
         /* ============================================
            MS Word 365 정확 재현 - 전체 셸 (flex column app shell)
            ============================================ */
