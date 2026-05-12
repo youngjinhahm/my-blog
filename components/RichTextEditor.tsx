@@ -2595,7 +2595,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                         <option value="'Brush Script MT', cursive" style={{ fontFamily: "'Brush Script MT'" }}>Brush Script</option>
                       </optgroup>
                     </select>
-                    <select onChange={handleFontSizeChange} className="word-size-select" value={currentFontSize || '10pt'}>
+                    <select onChange={handleFontSizeChange} className="word-size-select" value={currentFontSize || '13pt'}>
                       {/* 적용된 크기가 표준 목록에 없으면 동적 옵션 추가 (예: Ctrl+]/[ 로 11pt 등) */}
                       {!!currentFontSize && ![8,9,10,11,12,13,14,15,16,18,20,22,24,26,28,32,36,40,48,60,72].map(n => `${n}pt`).includes(currentFontSize) && (
                         <option value={currentFontSize}>{currentFontSize.replace('pt','')}</option>
@@ -3952,15 +3952,15 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .ProseMirror {
           outline: none;
           font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif !important;
-          font-size: 10pt !important;
-          line-height: 1.15 !important;
+          font-size: 13pt !important;
+          line-height: 1.5 !important;
           color: #1f2937;
         }
         /* p/h/li 도 명시적으로 → 컨테이너의 .prose 잔여물에서 살아남도록 */
         .ProseMirror p,
         .ProseMirror li {
-          font-size: 10pt;
-          line-height: 1.15;
+          font-size: 13pt;
+          line-height: 1.5;
         }
         /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
         .ProseMirror p,

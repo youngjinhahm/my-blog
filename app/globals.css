@@ -199,8 +199,8 @@
    ============================================ */
 .post-content {
   font-family: 'Times New Roman', Times, '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', serif;
-  font-size: 10pt;
-  line-height: 1.15;
+  font-size: 13pt;
+  line-height: 1.5;
   color: #1f2937;
 }
 .post-content p,
@@ -330,5 +330,5 @@
 .post-content > p {
   white-space: pre-wrap;
   /* 빈 단락도 한 줄 높이 유지 (margin: 0 인 상태에서도 시각적 빈 줄 보이게) */
-  min-height: 1.15em;
+  min-height: 1.5em;
 }
