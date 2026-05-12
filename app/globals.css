@@ -307,18 +307,3 @@
   font-family: 'Times New Roman', Georgia, serif;
 }
 
-
-/* === 본문 굵기 정상화 (인라인 font-weight 잔여물 무력화) === */
-/* !important — 외부 콘텐츠의 inline style="font-weight: 700" 을 이기기 위해 */
-.post-content p,
-.post-content li,
-.post-content p span,
-.post-content li span {
-  font-weight: normal !important;
-}
-.post-content p strong,
-.post-content p b,
-.post-content li strong,
-.post-content li b {
-  font-weight: 700 !important;
-}

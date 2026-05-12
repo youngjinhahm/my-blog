@@ -3920,21 +3920,6 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           font-size: 10pt;
           line-height: 1.15;
         }
-        /* 본문/목록 — 인라인 font-weight 잔여물 무력화 (Bold 마크 == <strong> 만 굵게) */
-        /* !important 가 필요: 외부 콘텐츠의 inline style="font-weight: 700" 을 이기기 위해 */
-        .ProseMirror p,
-        .ProseMirror li,
-        .ProseMirror p span,
-        .ProseMirror li span {
-          font-weight: normal !important;
-        }
-        .ProseMirror p strong,
-        .ProseMirror p b,
-        .ProseMirror li strong,
-        .ProseMirror li b {
-          font-weight: 700 !important;
-        }
-
         /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
         .ProseMirror p,
         .ProseMirror h1,
