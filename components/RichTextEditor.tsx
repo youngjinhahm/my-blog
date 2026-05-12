@@ -3792,7 +3792,8 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         <div
           className="mx-auto bg-white shadow-lg relative editor-page"
           style={{
-            width: getPageDims().width + 'cm',
+            // 페이지 폭: 1080px 고정 (블로그와 동일). 높이는 A4 기준으로 페이지 분할 안내선 유지
+            width: '1080px',
             maxWidth: 'none',
             minHeight: getPageDims().height + 'cm',
             padding: pageMargins.top + ' ' + pageMargins.right + ' ' + pageMargins.bottom + ' ' + pageMargins.left,
