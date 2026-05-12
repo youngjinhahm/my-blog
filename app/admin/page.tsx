@@ -14,6 +14,8 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingPost, setEditingPost] = useState<Post | null>(null)
   const [user, setUser] = useState<any>(null)
+  // 사용자가 슬러그를 직접 수정한 적이 있으면 더 이상 자동 갱신하지 않음
+  const [slugDirty, setSlugDirty] = useState(false)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -26,6 +28,30 @@ export default function AdminPage() {
   })
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
+
+  // 제목 → 슬러그 자동 생성 (한/영 슬러그)
+  function slugify(text: string): string {
+    if (!text) return ''
+    let out = text.toLowerCase().normalize('NFKC')
+    out = out.replace(/[^a-z0-9\u3131-\uD79D\s-]/g, '')
+    out = out.replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    if (!out) out = `post-${Date.now().toString(36)}`
+    return out.slice(0, 80)
+  }
+  // 본문 HTML → 짧은 요약 자동 추출
+  function extractExcerpt(html: string, max = 180): string {
+    if (!html) return ''
+    const text = html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (text.length <= max) return text
+    return text.slice(0, max).replace(/\s+\S*$/, '') + '…'
+  }
 
   // === 임시 저장글 시스템 (v2: 여러 개 저장 가능) ===
   type DraftPayload = {
@@ -314,6 +340,7 @@ export default function AdminPage() {
   function handleNewPost() {
     setEditingPost(null)
     setCurrentDraftId(null) // 첫 자동저장 시 새 ID 생성
+    setSlugDirty(false)
     setFormData({
       title: '',
       slug: '',
@@ -341,6 +368,7 @@ export default function AdminPage() {
       setEditingPost(null)
     }
     setCurrentDraftId(d.id)
+    setSlugDirty(!!d.slug)
     setFormData({
       title: d.title || '',
       slug: d.slug || '',
@@ -409,6 +437,7 @@ export default function AdminPage() {
         }
       } catch {}
     }
+    setSlugDirty(true)
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -517,7 +546,7 @@ export default function AdminPage() {
           title: formData.title,
           slug: formData.slug,
           content: formData.content,
-          excerpt: formData.excerpt || null,
+          excerpt: formData.excerpt || extractExcerpt(formData.content) || null,
           published: true,
           is_private: formData.is_private,
           category: formData.category,
@@ -551,7 +580,7 @@ export default function AdminPage() {
           title: formData.title,
           slug,
           content: formData.content,
-          excerpt: formData.excerpt || null,
+          excerpt: formData.excerpt || extractExcerpt(formData.content) || null,
           published: true,
           is_private: formData.is_private,
           category: formData.category,
@@ -649,7 +678,14 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    onChange={(e) => {
+                      const newTitle = e.target.value
+                      setFormData(fd => ({
+                        ...fd,
+                        title: newTitle,
+                        slug: slugDirty || editingPost ? fd.slug : slugify(newTitle),
+                      }))
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
@@ -662,10 +698,12 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={formData.slug}
-                    onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                    onChange={(e) => {
+                      setSlugDirty(true)
+                      setFormData({ ...formData, slug: e.target.value })
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="예: my-first-post"
-                    required
+                    placeholder={formData.title ? slugify(formData.title) : '비워두면 제목에서 자동 생성'}
                   />
                 </div>
               </div>
@@ -696,7 +734,7 @@ export default function AdminPage() {
                   onChange={(e) => setFormData({...formData, excerpt: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={2}
-                  placeholder="글 목록에 표시될 짧은 요약을 작성하세요"
+                  placeholder={formData.content ? extractExcerpt(formData.content) || '비워두면 본문에서 자동 생성' : '비워두면 본문에서 자동 생성'}
                 />
               </div>
 

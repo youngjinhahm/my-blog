@@ -857,6 +857,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showSizeMenu, setShowSizeMenu] = useState(false)
   const [showColumnsMenu, setShowColumnsMenu] = useState(false)
   const [showBreaksMenu, setShowBreaksMenu] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(120)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -956,6 +957,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
           event.preventDefault()
           setShowFindReplace(!showFindReplace)
+          return true
+        }
+        // Ctrl+/ = 단축키 도움말 모달
+        if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+          event.preventDefault()
+          setShowHelp(true)
           return true
         }
         // Ctrl+Enter = Page Break
@@ -2067,6 +2074,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           <div className="flex-1 text-center text-[12px] text-white/95 font-normal tracking-wide truncate">문서 1 — Word</div>
 
           <div className="flex items-center gap-1 ml-3">
+            <button type="button" onClick={() => setShowHelp(true)} className="word-titlebar-btn" title="단축키 도움말 (Ctrl+/)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/><path d="M9.5 9a2.5 2.5 0 015 0c0 1.3-1 1.7-1.7 2.2-.6.4-.8 1-.8 1.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none"/><circle cx="12" cy="17" r="0.9" fill="currentColor"/></svg>
+            </button>
             <button type="button" onClick={() => setIsFullscreen(!isFullscreen)} className="word-titlebar-btn" title={isFullscreen ? '창 모드' : '전체화면'}>
               {isFullscreen ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 14h6v6M20 10h-6V4M4 14L10 8M20 10l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
@@ -3101,6 +3111,103 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       )}
 
       {/* === 사용자 지정 여백 다이얼로그 === */}
+      {/* 단축키 도움말 모달 (Ctrl+/) */}
+      {showHelp && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/30" onMouseDown={() => setShowHelp(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-[640px] max-w-[92vw] max-h-[88vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-lg font-semibold text-gray-900">단축키 및 자동 변환</h2>
+              <button type="button" onClick={() => setShowHelp(false)} className="text-gray-500 hover:text-gray-900 text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 space-y-5 text-sm text-gray-800">
+              {[
+                { title: '서식', rows: [
+                  ['Ctrl+B', '굵게'],
+                  ['Ctrl+I', '기울임'],
+                  ['Ctrl+U', '밑줄'],
+                  ['Ctrl+]', '글자 크기 +1pt'],
+                  ['Ctrl+[', '글자 크기 -1pt'],
+                  ['Ctrl+Shift+>', '글자 크기 +2pt'],
+                  ['Ctrl+Shift+<', '글자 크기 -2pt'],
+                ]},
+                { title: '단락', rows: [
+                  ['Ctrl+L', '왼쪽 정렬'],
+                  ['Ctrl+E', '가운데 정렬'],
+                  ['Ctrl+R', '오른쪽 정렬'],
+                  ['Ctrl+J', '양쪽 정렬'],
+                  ['Ctrl+Shift+L (또는 Ctrl+Shift+8)', '글머리 기호 목록'],
+                  ['Ctrl+Shift+7', '번호 매기기 목록'],
+                  ['Ctrl+1 / 2 / 5', '줄간격 1.0 / 2.0 / 1.5'],
+                  ['Ctrl+Enter', '페이지 나누기'],
+                ]},
+                { title: '편집 / 이동', rows: [
+                  ['Ctrl+←/→', '단어 단위 이동'],
+                  ['Shift+←/→', '한 글자씩 블록 선택'],
+                  ['Ctrl+Shift+←/→', '단어 단위 블록 선택'],
+                  ['Home / End', '줄 처음 / 끝'],
+                  ['Ctrl+Home / End', '문서 처음 / 끝'],
+                  ['Ctrl+Backspace / Delete', '앞/뒤 단어 한 번에 삭제'],
+                  ['Ctrl+A', '전체 선택'],
+                  ['Ctrl+Z / Y', '실행 취소 / 다시 실행'],
+                  ['Ctrl+F', '찾기 및 바꾸기'],
+                  ['Ctrl+/', '이 도움말'],
+                ]},
+                { title: '서식 복사', rows: [
+                  ['클릭', '한 번 적용 후 해제'],
+                  ['더블클릭', '여러 번 연속 적용 (ESC로 해제)'],
+                ]},
+                { title: '마크다운 자동 변환 (입력 즉시 변환)', rows: [
+                  ['# 제목', '제목 1'],
+                  ['## 제목', '제목 2'],
+                  ['### 제목', '제목 3'],
+                  ['**굵게**', '굵게'],
+                  ['*기울임* 또는 _기울임_', '기울임'],
+                  ['`코드`', '인라인 코드'],
+                  ['- 항목 (또는 * 항목)', '글머리 기호 목록'],
+                  ['1. 항목', '번호 매기기 목록'],
+                  ['> 인용', '인용구'],
+                  ['---', '구분선'],
+                  ['```', '코드 블록'],
+                ]},
+                { title: '기호 자동 변환', rows: [
+                  ['--', '— (em dash)'],
+                  ['->', '→'],
+                  ['<-', '←'],
+                  ['...', '… (말줄임표)'],
+                  ['(c) / (r) / (tm)', '© / ® / ™'],
+                ]},
+                { title: '이미지 / 표', rows: [
+                  ['이미지 드래그 & 드롭', '에디터에 끌어다 놓으면 자동 업로드'],
+                  ['이미지 Ctrl+V (스크린샷 등)', '클립보드 이미지 자동 업로드'],
+                  ['이미지 클릭', '아래에 크기/정렬 툴바 표시'],
+                  ['표 열 우측 가장자리 드래그', '열 너비 조절'],
+                  ['표 행 아래 가장자리 드래그', '행 높이 조절'],
+                ]},
+              ].map((section) => (
+                <div key={section.title}>
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{section.title}</div>
+                  <table className="w-full">
+                    <tbody>
+                      {section.rows.map(([key, desc], i) => (
+                        <tr key={i} className="border-b border-gray-100 last:border-0">
+                          <td className="py-1.5 pr-4 w-[220px]">
+                            <kbd className="inline-block px-2 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[12px] text-gray-800">{key}</kbd>
+                          </td>
+                          <td className="py-1.5 text-gray-700">{desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                💡 Mac 에서는 Ctrl 대신 ⌘(Cmd) 키를 사용하세요.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCustomMargins && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowCustomMargins(false)}>
           <div className="bg-white rounded-lg shadow-xl p-5 w-[480px] max-w-full" onClick={(e) => e.stopPropagation()}>
