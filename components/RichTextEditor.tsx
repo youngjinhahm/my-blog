@@ -1026,6 +1026,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       }),
       Link.configure({
         openOnClick: false,
+        // 자동 링크 감지 비활성화 — 사용자가 명시적으로 Ctrl+K / 툴바로 링크 걸 때만 적용
+        // (주식 티커 '062404.KP' 가 .kp TLD 로 잡혀서 자동 링크되던 문제 차단)
+        autolink: false,
+        linkOnPaste: false,
       }),
       ResizableImage.configure({
         inline: false,
