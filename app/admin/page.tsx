@@ -29,6 +29,22 @@ export default function AdminPage() {
   })
   const [uploadingFeatured, setUploadingFeatured] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  // === 수정 히스토리 ===
+  type Revision = {
+    id: string
+    post_id: string
+    title: string | null
+    slug: string | null
+    content: string | null
+    excerpt: string | null
+    category: string | null
+    is_private: boolean | null
+    featured_image_url: string | null
+    saved_at: string
+  }
+  const [revisions, setRevisions] = useState<Revision[]>([])
+  const [showRevisions, setShowRevisions] = useState(false)
+  const [previewRevision, setPreviewRevision] = useState<Revision | null>(null)
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
 
   // 제목 → 슬러그 자동 생성 (한/영 슬러그)
@@ -547,6 +563,45 @@ export default function AdminPage() {
     return err.code === '23505' || msg.includes('posts_slug_key') || (msg.includes('duplicate') && msg.includes('slug'))
   }
 
+  // 현재 편집 중인 글의 모든 수정 히스토리 로드
+  async function fetchRevisions(postId: string) {
+    const { data, error } = await supabase
+      .from('post_revisions')
+      .select('*')
+      .eq('post_id', postId)
+      .order('saved_at', { ascending: false })
+    if (error) {
+      console.warn('수정 히스토리 로드 실패:', error.message)
+      setRevisions([])
+      return
+    }
+    setRevisions((data || []) as Revision[])
+  }
+
+  // 수정 히스토리 모달 열기
+  async function openRevisions() {
+    if (!editingPost) return
+    await fetchRevisions(editingPost.id)
+    setShowRevisions(true)
+  }
+
+  // 특정 버전으로 폼 내용 되돌리기 (실제 DB 적용은 "수정 완료" 눌러야 함)
+  function restoreRevision(rev: Revision) {
+    if (!confirm(`${new Date(rev.saved_at).toLocaleString('ko-KR')} 시점 버전으로 되돌릴까요?\n\n(이 폼의 내용만 바뀝니다. "수정 완료" 를 눌러야 실제로 적용됩니다.)`)) return
+    setFormData(fd => ({
+      ...fd,
+      title: rev.title || '',
+      slug: rev.slug || fd.slug,
+      content: rev.content || '',
+      excerpt: rev.excerpt || '',
+      is_private: rev.is_private ?? fd.is_private,
+      featured_image_url: rev.featured_image_url || '',
+      category: rev.category || fd.category,
+    }))
+    setShowRevisions(false)
+    setPreviewRevision(null)
+  }
+
   async function handleFeaturedImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -837,6 +892,16 @@ export default function AdminPage() {
                 >
                   💾 임시 저장
                 </button>
+                {editingPost && (
+                  <button
+                    type="button"
+                    onClick={openRevisions}
+                    className="bg-slate-600 text-white px-6 py-3 rounded-lg hover:bg-slate-700 transition font-medium"
+                    title="이 글의 이전 버전 보기"
+                  >
+                    🕓 버전 기록
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleExportPDF}
@@ -859,6 +924,76 @@ export default function AdminPage() {
                 )}
               </div>
             </form>
+          </div>
+        )}
+
+        {/* 수정 히스토리 모달 */}
+        {showRevisions && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40" onMouseDown={() => { setShowRevisions(false); setPreviewRevision(null) }}>
+            <div className="bg-white rounded-lg shadow-2xl w-[920px] max-w-[95vw] max-h-[90vh] flex flex-col" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">버전 기록</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">글이 수정될 때마다 자동으로 이전 버전이 보관됩니다. 클릭해서 미리보기 후 복원할 수 있습니다.</p>
+                </div>
+                <button type="button" onClick={() => { setShowRevisions(false); setPreviewRevision(null) }} className="text-gray-500 hover:text-gray-900 text-2xl leading-none">×</button>
+              </div>
+              <div className="flex-1 overflow-hidden flex">
+                {/* 왼쪽: 버전 목록 */}
+                <div className="w-[300px] border-r border-gray-200 overflow-y-auto">
+                  {revisions.length === 0 ? (
+                    <div className="p-6 text-sm text-gray-500 text-center">
+                      이 글에는 아직 이전 버전이 없습니다.<br /><br />
+                      <span className="text-xs">앞으로 글을 수정하면 매번 이전 버전이 자동 저장됩니다.</span>
+                    </div>
+                  ) : (
+                    <ul>
+                      {revisions.map((r, i) => {
+                        const date = new Date(r.saved_at)
+                        return (
+                          <li key={r.id}>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewRevision(r)}
+                              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-blue-50 ${previewRevision?.id === r.id ? 'bg-blue-100' : ''}`}
+                            >
+                              <div className="text-sm font-medium text-gray-900 truncate">{r.title || '(제목 없음)'}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{date.toLocaleString('ko-KR')}</div>
+                              <div className="text-[11px] text-gray-400 mt-0.5">버전 {revisions.length - i}</div>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+                {/* 오른쪽: 미리보기 */}
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                  {previewRevision ? (
+                    <div className="p-6">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold text-gray-900">{previewRevision.title}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">저장 시각: {new Date(previewRevision.saved_at).toLocaleString('ko-KR')}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => restoreRevision(previewRevision)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
+                        >
+                          이 버전으로 되돌리기
+                        </button>
+                      </div>
+                      <div className="bg-white rounded shadow-sm p-5 post-content border border-gray-200" dangerouslySetInnerHTML={{ __html: previewRevision.content || '' }} />
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                      왼쪽 목록에서 버전을 선택하면 미리보기가 표시됩니다
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
