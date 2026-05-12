@@ -51,6 +51,14 @@ const cellExtraAttrs = () => ({
       return { style: `background-color: ${attributes.backgroundColor}` }
     },
   },
+  verticalAlign: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.verticalAlign || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.verticalAlign) return {}
+      return { style: `vertical-align: ${attributes.verticalAlign}` }
+    },
+  },
   borderTop: {
     default: null as string | null,
     parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderTop || null,
@@ -357,6 +365,32 @@ const SmartTypography = Extension.create({
       // (tm) → ™
       textInputRule({ find: /\(tm\)$/i, replace: '™' }),
     ]
+  },
+})
+
+// 머리글자 강조 (Drop Cap) — 단락 첫 글자를 크게 표시
+const DropCap = Extension.create({
+  name: 'dropCap',
+  addOptions() { return { types: ['paragraph'] } },
+  addGlobalAttributes() {
+    return [{
+      types: this.options.types,
+      attributes: {
+        dropCap: {
+          default: null as string | null,
+          parseHTML: (el: HTMLElement) => el.classList.contains('drop-cap') ? 'on' : null,
+          renderHTML: (attrs: any) => attrs.dropCap === 'on' ? { class: 'drop-cap my-0' } : {},
+        },
+      },
+    }]
+  },
+  addCommands() {
+    return {
+      toggleDropCap: () => ({ chain, editor }: any) => {
+        const cur = editor.getAttributes('paragraph').dropCap
+        return chain().updateAttributes('paragraph', { dropCap: cur === 'on' ? null : 'on' }).run()
+      },
+    } as any
   },
 })
 
@@ -899,6 +933,18 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showImageToolbar, setShowImageToolbar] = useState(false)
   const [imageToolbarPos, setImageToolbarPos] = useState({ top: 0, left: 0 })
   const [tableToolbarPos, setTableToolbarPos] = useState<{ top: number; left: number; show: boolean }>({ top: 0, left: 0, show: false })
+  const [miniToolbar, setMiniToolbar] = useState<{ top: number; left: number; show: boolean }>({ top: 0, left: 0, show: false })
+  // 표 호버 인서트(+) 상태
+  const [tableInserts, setTableInserts] = useState<{
+    rowGaps: Array<{ y: number; rowIdx: number; before: boolean }>;
+    colGaps: Array<{ x: number; colIdx: number; before: boolean }>;
+    tableTop: number;
+    tableLeft: number;
+    tableId: string;
+  } | null>(null)
+  // 셀 배경색 / 정렬 메뉴 표시
+  const [showCellColorMenu, setShowCellColorMenu] = useState(false)
+  const [showCellVAlignMenu, setShowCellVAlignMenu] = useState(false)
   const replaceImageRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
@@ -918,6 +964,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       FontSize,
       SmartTypography,
       WordShortcuts,
+      DropCap,
       LineHeight,
       Indent,
       Color,
@@ -967,7 +1014,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       attributes: {
         class: 'max-w-none focus:outline-none min-h-[26cm]',
         spellcheck: 'true',
-        // 한/영 혼용 본문이라 lang 을 지정하지 않음 — 브라우저가 자동 감지
+        // lang="ko-KR" 로 한국어 사전을 우선 사용. 영어 단어는 브라우저가 자동 인식.
+        // (Word 와 가장 유사한 동작: 한국어 본문 기준으로 맞춤법 검사, 잘못 표시된 단어는 우클릭 → "사전에 추가" 로 OS 사전에 등록 가능)
+        lang: 'ko-KR',
       },
       handleKeyDown: (view, event) => {
         // Ctrl+F = Find
@@ -1313,6 +1362,148 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     return () => { try { dom.removeEventListener('mouseup', onMouseUp, true) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, painterMode, painterMarks, painterLocked])
+
+  // 텍스트 선택 시 미니 도구 모음 표시 (Word's Mini Toolbar 스타일)
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      const { from, to, empty } = editor.state.selection
+      // 빈 선택, 표 안, 이미지 선택 시엔 미니 툴바 안 보임
+      if (empty || editor.isActive('table') || editor.isActive('image')) {
+        setMiniToolbar(p => p.show ? { ...p, show: false } : p)
+        return
+      }
+      try {
+        const startCoords = editor.view.coordsAtPos(from)
+        const pageRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
+          || editor.view.dom.getBoundingClientRect()
+        const z = (zoomLevel || 100) / 100
+        // 선택 영역 위 38px (한 줄 위) 에 가운데 정렬
+        setMiniToolbar({
+          show: true,
+          top: (startCoords.top - pageRect.top) / z - 42,
+          left: (startCoords.left - pageRect.left + 30) / z,
+        })
+      } catch {}
+    }
+    editor.on('selectionUpdate', update)
+    return () => { try { editor.off('selectionUpdate', update) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, zoomLevel])
+
+  // 표 호버 시 행/열 사이에 "+" 버튼 노출 (Word 스타일)
+  useEffect(() => {
+    if (!editor) return
+    const root = editor.view.dom as HTMLElement
+    const onMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      const tableEl = target?.closest && target.closest('table')
+      if (!tableEl || !root.contains(tableEl as HTMLElement)) {
+        setTableInserts(null)
+        return
+      }
+      // 마우스가 표 + 여백 16px 영역 안인지 확인 (살짝 바깥에서도 호버 유지)
+      const rect = (tableEl as HTMLElement).getBoundingClientRect()
+      const PAD = 20
+      if (e.clientX < rect.left - PAD || e.clientX > rect.right + PAD ||
+          e.clientY < rect.top - PAD || e.clientY > rect.bottom + PAD) {
+        setTableInserts(null)
+        return
+      }
+      // 줌 보정용
+      const pageRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
+        || editor.view.dom.getBoundingClientRect()
+      const z = (zoomLevel || 100) / 100
+      // 각 행의 top/bottom 위치 (table 기준 상대 좌표, 줌 보정 후)
+      const trs = (tableEl as HTMLElement).querySelectorAll('tr')
+      const rowGaps: Array<{ y: number; rowIdx: number; before: boolean }> = []
+      trs.forEach((tr, idx) => {
+        const r = (tr as HTMLElement).getBoundingClientRect()
+        if (idx === 0) {
+          rowGaps.push({ y: (r.top - rect.top) / z, rowIdx: 0, before: true })
+        }
+        rowGaps.push({ y: (r.bottom - rect.top) / z, rowIdx: idx, before: false })
+      })
+      // 각 열의 left/right (첫 번째 행의 셀 기준)
+      const cells0 = trs[0]?.querySelectorAll('td, th')
+      const colGaps: Array<{ x: number; colIdx: number; before: boolean }> = []
+      if (cells0) {
+        cells0.forEach((cell, idx) => {
+          const r = (cell as HTMLElement).getBoundingClientRect()
+          if (idx === 0) {
+            colGaps.push({ x: (r.left - rect.left) / z, colIdx: 0, before: true })
+          }
+          colGaps.push({ x: (r.right - rect.left) / z, colIdx: idx, before: false })
+        })
+      }
+      setTableInserts({
+        rowGaps,
+        colGaps,
+        tableTop: (rect.top - pageRect.top) / z,
+        tableLeft: (rect.left - pageRect.left) / z,
+        tableId: String((tableEl as HTMLElement).offsetTop) + 'x' + String((tableEl as HTMLElement).offsetLeft),
+      })
+    }
+    const onLeave = () => setTableInserts(null)
+    root.addEventListener('mousemove', onMove)
+    root.addEventListener('mouseleave', onLeave)
+    return () => {
+      root.removeEventListener('mousemove', onMove)
+      root.removeEventListener('mouseleave', onLeave)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, zoomLevel])
+
+  // 표 호버 "+" 클릭 시 해당 위치에 행/열 삽입
+  const insertRowAtIndex = (rowIdx: number, before: boolean) => {
+    if (!editor) return
+    // 현재 호버 중인 테이블 DOM 찾기 (mousemove 가 캐시한 정보 활용)
+    const tables = editor.view.dom.querySelectorAll('table')
+    let target: HTMLElement | null = null
+    for (const t of Array.from(tables)) {
+      const trs = (t as HTMLElement).querySelectorAll('tr')
+      if (trs[rowIdx]) { target = t as HTMLElement; break }
+    }
+    if (!target) return
+    const trs = target.querySelectorAll('tr')
+    const targetRow = trs[rowIdx]
+    if (!targetRow) return
+    const firstCell = (targetRow.querySelector('td, th') as HTMLElement) || null
+    if (!firstCell) return
+    const pos = editor.view.posAtDOM(firstCell, 0)
+    editor.chain().focus().setTextSelection(pos).run()
+    if (before) editor.chain().focus().addRowBefore().run()
+    else editor.chain().focus().addRowAfter().run()
+  }
+  const insertColAtIndex = (colIdx: number, before: boolean) => {
+    if (!editor) return
+    const tables = editor.view.dom.querySelectorAll('table')
+    const target = tables[0] as HTMLElement | undefined
+    if (!target) return
+    const firstRowCells = target.querySelectorAll('tr')[0]?.querySelectorAll('td, th')
+    const targetCell = firstRowCells?.[colIdx] as HTMLElement | undefined
+    if (!targetCell) return
+    const pos = editor.view.posAtDOM(targetCell, 0)
+    editor.chain().focus().setTextSelection(pos).run()
+    if (before) editor.chain().focus().addColumnBefore().run()
+    else editor.chain().focus().addColumnAfter().run()
+  }
+
+  // 셀 배경색 / 세로 정렬 적용
+  const setCellBackground = (color: string | null) => {
+    if (!editor) return
+    if (color) {
+      editor.chain().focus().updateAttributes('tableCell', { backgroundColor: color }).updateAttributes('tableHeader', { backgroundColor: color }).run()
+    } else {
+      editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run()
+    }
+    setShowCellColorMenu(false)
+  }
+  const setCellVerticalAlign = (v: 'top' | 'middle' | 'bottom') => {
+    if (!editor) return
+    editor.chain().focus().updateAttributes('tableCell', { verticalAlign: v }).updateAttributes('tableHeader', { verticalAlign: v }).run()
+    setShowCellVAlignMenu(false)
+  }
 
   // 표 셀에 커서가 있으면 표 상단에 플로팅 툴바 표시 (Word 스타일)
   useEffect(() => {
@@ -1929,7 +2120,26 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   }
 
 
-  // === MS Word 스타일 헬퍼 ===
+  // === MS Word 스타일 갤러리 — Live Preview 지원 ===
+  // hover 시 잠시 스타일 적용, mouseleave 시 원상복구
+  const stylePreviewSnap = useRef<any>(null)
+  const previewStyle = (style: string) => {
+    if (!editor) return
+    if (!stylePreviewSnap.current) {
+      stylePreviewSnap.current = editor.getJSON()
+    }
+    applyStyle(style)
+  }
+  const restorePreview = () => {
+    if (!editor || !stylePreviewSnap.current) return
+    editor.commands.setContent(stylePreviewSnap.current, { emitUpdate: false })
+    stylePreviewSnap.current = null
+  }
+  const commitPreview = () => {
+    // 클릭 시: 미리보기 상태를 그대로 유지 (스냅샷 비움)
+    stylePreviewSnap.current = null
+  }
+
   const applyStyle = (style: string) => {
     if (!editor) return
     const chain: any = editor.chain().focus()
@@ -2421,12 +2631,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               {/* ========== 스타일 그룹 (갤러리) ========== */}
               <div className="word-group">
                 <div className="word-group-body word-styles-body">
-                  <button type="button" onClick={() => applyStyle('normal')} className="word-style-card" title="표준"><span style={{ fontSize: 11 }}>표준</span></button>
-                  <button type="button" onClick={() => applyStyle('h1')} className="word-style-card" title="제목 1"><span style={{ fontSize: 14, fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
-                  <button type="button" onClick={() => applyStyle('h2')} className="word-style-card" title="제목 2"><span style={{ fontSize: 12, fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
-                  <button type="button" onClick={() => applyStyle('title')} className="word-style-card" title="제목"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
-                  <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card" title="부제"><span style={{ fontSize: 11, fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
-                  <button type="button" onClick={() => applyStyle('quote')} className="word-style-card" title="인용"><span style={{ fontSize: 11, fontStyle: 'italic' }}>"인용"</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('normal') }} onMouseEnter={() => previewStyle('normal')} onMouseLeave={restorePreview} className="word-style-card" title="표준"><span style={{ fontSize: 11 }}>표준</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('h1') }} onMouseEnter={() => previewStyle('h1')} onMouseLeave={restorePreview} className="word-style-card" title="제목 1"><span style={{ fontSize: 14, fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('h2') }} onMouseEnter={() => previewStyle('h2')} onMouseLeave={restorePreview} className="word-style-card" title="제목 2"><span style={{ fontSize: 12, fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('title') }} onMouseEnter={() => previewStyle('title')} onMouseLeave={restorePreview} className="word-style-card" title="제목"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('subtitle') }} onMouseEnter={() => previewStyle('subtitle')} onMouseLeave={restorePreview} className="word-style-card" title="부제"><span style={{ fontSize: 11, fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                  <button type="button" onClick={() => { commitPreview(); applyStyle('quote') }} onMouseEnter={() => previewStyle('quote')} onMouseLeave={restorePreview} className="word-style-card" title="인용"><span style={{ fontSize: 11, fontStyle: 'italic' }}>"인용"</span></button>
                   <button type="button" onClick={() => setShowStylesGallery(!showStylesGallery)} className="word-style-more" title="더 보기">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 3l4 4 4-4z"/></svg>
                   </button>
@@ -2436,17 +2646,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   <div className="absolute top-full right-0 z-30 bg-white border border-[#c8c6c4] shadow-[0_4px_12px_rgba(0,0,0,0.18)] p-3 w-[480px] mt-0.5">
                     <div className="text-xs font-semibold text-[#323130] mb-2">스타일 갤러리</div>
                     <div className="grid grid-cols-4 gap-1.5">
-                      <button type="button" onClick={() => applyStyle('normal')} className="word-style-card-lg"><span>표준</span></button>
-                      <button type="button" onClick={() => applyStyle('title')} className="word-style-card-lg"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
-                      <button type="button" onClick={() => applyStyle('subtitle')} className="word-style-card-lg"><span style={{ fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
-                      <button type="button" onClick={() => applyStyle('h1')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
-                      <button type="button" onClick={() => applyStyle('h2')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
-                      <button type="button" onClick={() => applyStyle('h3')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 3</span></button>
-                      <button type="button" onClick={() => applyStyle('h4')} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 4</span></button>
-                      <button type="button" onClick={() => applyStyle('strong')} className="word-style-card-lg"><span style={{ fontWeight: 700 }}>강조</span></button>
-                      <button type="button" onClick={() => applyStyle('emphasis')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>기울임</span></button>
-                      <button type="button" onClick={() => applyStyle('quote')} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>인용</span></button>
-                      <button type="button" onClick={() => applyStyle('code')} className="word-style-card-lg"><span style={{ fontFamily: 'monospace' }}>코드</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('normal') }} onMouseEnter={() => previewStyle('normal')} onMouseLeave={restorePreview} className="word-style-card-lg"><span>표준</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('title') }} onMouseEnter={() => previewStyle('title')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontSize: 16, fontWeight: 300, color: '#2b579a' }}>제목</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('subtitle') }} onMouseEnter={() => previewStyle('subtitle')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic', color: '#605e5c' }}>부제</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('h1') }} onMouseEnter={() => previewStyle('h1')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 1</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('h2') }} onMouseEnter={() => previewStyle('h2')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 2</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('h3') }} onMouseEnter={() => previewStyle('h3')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 3</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('h4') }} onMouseEnter={() => previewStyle('h4')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 600, color: '#2b579a' }}>제목 4</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('strong') }} onMouseEnter={() => previewStyle('strong')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontWeight: 700 }}>강조</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('emphasis') }} onMouseEnter={() => previewStyle('emphasis')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>기울임</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('quote') }} onMouseEnter={() => previewStyle('quote')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontStyle: 'italic' }}>인용</span></button>
+                      <button type="button" onClick={() => { commitPreview(); applyStyle('code') }} onMouseEnter={() => previewStyle('code')} onMouseLeave={restorePreview} className="word-style-card-lg"><span style={{ fontFamily: 'monospace' }}>코드</span></button>
                     </div>
                   </div>
                 )}
@@ -2617,6 +2827,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               <div className="word-group">
                 <div className="word-group-body">
                   <div className="word-group-col">
+                    <button type="button" onClick={() => (editor.chain().focus() as any).toggleDropCap().run()} className={`word-btn-large ${(editor.getAttributes('paragraph').dropCap === 'on') ? 'word-btn-active' : ''}`} title="머리글자 (Drop Cap)">
+                      <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><text x="0" y="20" fontFamily="Times New Roman" fontSize="22" fontWeight="700" fill="#2b579a">A</text><line x1="13" y1="6" x2="22" y2="6" stroke="#605e5c" strokeWidth="1"/><line x1="13" y1="10" x2="22" y2="10" stroke="#605e5c" strokeWidth="1"/><line x1="13" y1="14" x2="22" y2="14" stroke="#605e5c" strokeWidth="1"/><line x1="13" y1="18" x2="22" y2="18" stroke="#605e5c" strokeWidth="1"/></svg>
+                      <span className="word-btn-label">머리글자</span>
+                    </button>
                     <button type="button" onClick={() => setShowWordArtMenu(!showWordArtMenu)} className="word-btn-large" title="WordArt">
                       <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="wa1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2b579a"/><stop offset="1" stopColor="#e74c3c"/></linearGradient></defs><text x="12" y="17" textAnchor="middle" fontSize="18" fontWeight="800" fill="url(#wa1)" style={{ fontFamily: 'Georgia,serif' }}>A</text></svg>
                       <span className="word-btn-label">WordArt ▾</span>
@@ -3396,6 +3610,86 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           }}
         >
           <EditorContent editor={editor} />
+          {/* 미니 선택 도구 모음 — 텍스트 드래그 선택 시 표시 (Word's Mini Toolbar) */}
+          {miniToolbar.show && (
+            <div
+              className="absolute z-40 flex items-center gap-0.5 bg-white border border-gray-300 rounded-md shadow-xl px-1 py-1"
+              style={{ top: `${miniToolbar.top}px`, left: `${miniToolbar.left}px`, transform: 'translateX(-50%)' }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('bold') ? 'bg-blue-100' : ''}`} title="굵게 (Ctrl+B)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="6" y="18" fontFamily="Times New Roman" fontSize="17" fontWeight="900">B</text></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('italic') ? 'bg-blue-100' : ''}`} title="기울임 (Ctrl+I)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="18" fontFamily="Times New Roman" fontSize="17" fontStyle="italic">I</text></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('underline') ? 'bg-blue-100' : ''}`} title="밑줄 (Ctrl+U)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="16" fontFamily="Times New Roman" fontSize="15" textDecoration="underline">U</text><line x1="5" y1="20" x2="14" y2="20" stroke="currentColor" strokeWidth="1.5"/></svg>
+              </button>
+              <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('strike') ? 'bg-blue-100' : ''}`} title="취소선">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="17" fontFamily="Arial" fontSize="14">S</text><line x1="3" y1="13" x2="14" y2="13" stroke="currentColor" strokeWidth="1.6"/></svg>
+              </button>
+              <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => stepFontSize(1)} className="p-1 rounded hover:bg-blue-50" title="크게 (Ctrl+])">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="17" fontSize="16" fontWeight="700">A</text><text x="14" y="9" fontSize="9" fontWeight="700">▲</text></svg>
+              </button>
+              <button type="button" onClick={() => stepFontSize(-1)} className="p-1 rounded hover:bg-blue-50" title="작게 (Ctrl+[)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="17" fontSize="13" fontWeight="700">A</text><text x="14" y="17" fontSize="9" fontWeight="700">▼</text></svg>
+              </button>
+              <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+              {/* 글자색 */}
+              <label className="p-1 rounded hover:bg-blue-50 cursor-pointer relative" title="글자색">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><text x="3" y="11" fontSize="10" fontWeight="700" fill="currentColor">A</text><rect x="2" y="13" width="12" height="2" fill="#ef4444"/></svg>
+                <input type="color" onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} onMouseDown={(e) => e.stopPropagation()} className="absolute inset-0 opacity-0 cursor-pointer" />
+              </label>
+              {/* 형광펜 */}
+              <label className="p-1 rounded hover:bg-blue-50 cursor-pointer relative" title="형광펜">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="10" width="10" height="3" fill="#fde047"/><path d="M3 10l3-7 4 1-3 9z" fill="#fde047" stroke="currentColor" strokeWidth="1"/></svg>
+                <input type="color" onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()} onMouseDown={(e) => e.stopPropagation()} className="absolute inset-0 opacity-0 cursor-pointer" />
+              </label>
+              <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+              <button type="button" onClick={() => openHyperlinkDialog()} className="p-1 rounded hover:bg-blue-50" title="링크 (Ctrl+K)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M7 9.5a3 3 0 003.7 0l2-2a2.6 2.6 0 00-3.7-3.7l-.7.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/><path d="M9 6.5a3 3 0 00-3.7 0l-2 2a2.6 2.6 0 003.7 3.7l.7-.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>
+              </button>
+            </div>
+          )}
+
+          {/* 표 호버 시 행/열 사이에 "+" 인서트 버튼 (Word 스타일) */}
+          {tableInserts && (
+            <>
+              {/* 행 사이 "+" — 표 왼쪽 가장자리 바깥 */}
+              {tableInserts.rowGaps.map((gap, i) => (
+                <button
+                  key={`row-${i}`}
+                  type="button"
+                  onClick={() => insertRowAtIndex(gap.rowIdx, gap.before)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="absolute z-30 w-5 h-5 flex items-center justify-center bg-white border border-blue-500 rounded-full text-blue-600 hover:bg-blue-500 hover:text-white text-xs font-bold shadow"
+                  style={{
+                    top: `${tableInserts.tableTop + gap.y - 10}px`,
+                    left: `${tableInserts.tableLeft - 22}px`,
+                  }}
+                  title={`${gap.before ? '위' : '아래'}에 행 삽입`}
+                >+</button>
+              ))}
+              {/* 열 사이 "+" — 표 위쪽 가장자리 바깥 */}
+              {tableInserts.colGaps.map((gap, i) => (
+                <button
+                  key={`col-${i}`}
+                  type="button"
+                  onClick={() => insertColAtIndex(gap.colIdx, gap.before)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="absolute z-30 w-5 h-5 flex items-center justify-center bg-white border border-blue-500 rounded-full text-blue-600 hover:bg-blue-500 hover:text-white text-xs font-bold shadow"
+                  style={{
+                    top: `${tableInserts.tableTop - 22}px`,
+                    left: `${tableInserts.tableLeft + gap.x - 10}px`,
+                  }}
+                  title={`${gap.before ? '왼쪽' : '오른쪽'}에 열 삽입`}
+                >+</button>
+              ))}
+            </>
+          )}
+
           {/* 표 셀에 커서 있을 때 표 상단 플로팅 툴바 (Word 스타일) */}
           {tableToolbarPos.show && (
             <div
@@ -3430,6 +3724,46 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               <button type="button" onClick={() => editor.chain().focus().splitCell().run()} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 분할">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" strokeWidth="1"/></svg>
               </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              {/* 셀 음영 (배경색) */}
+              <div className="relative">
+                <button type="button" onClick={() => { setShowCellColorMenu(v => !v); setShowCellVAlignMenu(false) }} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 음영">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="1" fill="#fde68a" stroke="currentColor" strokeWidth="1.2"/><path d="M4 11l2-2 3 3 4-4" stroke="#92400e" strokeWidth="1.4" fill="none"/></svg>
+                </button>
+                {showCellColorMenu && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-2 w-[208px]">
+                    <div className="text-[11px] text-gray-500 font-semibold mb-1.5">셀 음영</div>
+                    <div className="grid grid-cols-8 gap-1">
+                      {['#fef2f2','#fee2e2','#fecaca','#fef3c7','#fde68a','#fcd34d','#ecfccb','#bbf7d0','#86efac','#d1fae5','#cffafe','#bae6fd','#dbeafe','#bfdbfe','#e0e7ff','#c7d2fe','#ede9fe','#ddd6fe','#fce7f3','#fbcfe8','#f5f5f4','#e7e5e4','#d4d4d4','#262626'].map(c => (
+                        <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setCellBackground(c)} className="w-5 h-5 rounded border border-gray-300 hover:scale-110 transition" style={{ background: c }} title={c} />
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setCellBackground(null)} className="mt-2 w-full text-[11px] py-1 rounded hover:bg-gray-100 text-gray-700">채우기 없음</button>
+                  </div>
+                )}
+              </div>
+              {/* 셀 세로 정렬 */}
+              <div className="relative">
+                <button type="button" onClick={() => { setShowCellVAlignMenu(v => !v); setShowCellColorMenu(false) }} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 세로 정렬">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" strokeWidth="1.4"/></svg>
+                </button>
+                {showCellVAlignMenu && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-1 w-[140px]">
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setCellVerticalAlign('top')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded flex items-center gap-2">
+                      <svg width="14" height="14" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="3" y1="4" x2="13" y2="4" stroke="currentColor" strokeWidth="1.5"/></svg>
+                      위쪽 맞춤
+                    </button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setCellVerticalAlign('middle')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded flex items-center gap-2">
+                      <svg width="14" height="14" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.5"/></svg>
+                      가운데 맞춤
+                    </button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setCellVerticalAlign('bottom')} className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded flex items-center gap-2">
+                      <svg width="14" height="14" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="3" y1="12" x2="13" y2="12" stroke="currentColor" strokeWidth="1.5"/></svg>
+                      아래쪽 맞춤
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
               <button type="button" onClick={() => { if (confirm('표 전체를 삭제할까요?')) editor.chain().focus().deleteTable().run() }} className="p-1.5 hover:bg-red-50 rounded text-red-600" title="표 삭제">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1"/><line x1="6" y1="2" x2="6" y2="14" stroke="currentColor" strokeWidth="1"/><line x1="3" y1="9" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="13" x2="13" y2="9" stroke="currentColor" strokeWidth="1.5"/></svg>
@@ -4251,6 +4585,18 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         .ProseMirror pre .hljs-regexp { color: #ffab70; }
         .ProseMirror pre .hljs-deletion { background: rgba(248,81,73,0.2); color: #fdaeb7; }
         .ProseMirror pre .hljs-addition { background: rgba(46,160,67,0.2); color: #85e89d; }
+
+        /* === Drop Cap (머리글자) === */
+        .ProseMirror p.drop-cap::first-letter,
+        .post-content p.drop-cap::first-letter {
+          float: left;
+          font-size: 3.4em;
+          line-height: 0.9;
+          font-weight: 700;
+          margin: 4px 8px 0 0;
+          color: #1f2937;
+          font-family: 'Times New Roman', Georgia, serif;
+        }
 
         /* 기본 표 스타일 */
         .ProseMirror table {

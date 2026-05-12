@@ -294,3 +294,15 @@
 .post-content table.tbl-plain td,
 .post-content table.tbl-plain th { border: 1px solid #e5e7eb; }
 
+
+
+/* === Drop Cap (머리글자, 공개 페이지) === */
+.post-content p.drop-cap::first-letter {
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.9;
+  font-weight: 700;
+  margin: 4px 8px 0 0;
+  color: #1f2937;
+  font-family: 'Times New Roman', Georgia, serif;
+}
