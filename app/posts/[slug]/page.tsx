@@ -48,14 +48,14 @@ export default async function PostPage({
     <>
       <Nav />
       <main className="min-h-screen bg-gray-100 py-6 sm:py-10">
-        {/* A4 용지 (210mm × 297mm), narrow margin 1.27cm */}
+        {/* 글 읽기 영역 — 화면 폭에 맞춰 넓게, 좌우 회색 여백 축소 */}
         <article
           className="mx-auto bg-white shadow-md"
           style={{
-            width: '21cm',
-            maxWidth: '100%',
+            width: '1080px',
+            maxWidth: '95vw',
             minHeight: '29.7cm',
-            padding: '1.27cm',
+            padding: '48px 56px',
             boxSizing: 'border-box',
           }}
         >

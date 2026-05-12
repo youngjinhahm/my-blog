@@ -948,7 +948,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [showHelp, setShowHelp] = useState(false)
   const [showOutline, setShowOutline] = useState(false)
   const [outline, setOutline] = useState<Array<{ level: number; text: string; pos: number }>>([])
-  const [zoomLevel, setZoomLevel] = useState(120)
+  const [zoomLevel, setZoomLevel] = useState(100)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [charCount, setCharCount] = useState(0)
