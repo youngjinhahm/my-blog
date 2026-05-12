@@ -306,3 +306,18 @@
   color: #1f2937;
   font-family: 'Times New Roman', Georgia, serif;
 }
+
+
+/* === 본문 굵기 정상화 (인라인 font-weight 잔여물 무력화) === */
+.post-content p,
+.post-content li,
+.post-content p span,
+.post-content li span {
+  font-weight: normal;
+}
+.post-content p strong,
+.post-content p b,
+.post-content li strong,
+.post-content li b {
+  font-weight: 700;
+}

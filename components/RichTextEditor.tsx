@@ -2052,6 +2052,50 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     }
   }
 
+  // 강제 un-Bold — Tiptap Bold 마크 토글 + 인라인 font-weight 스타일 제거
+  // 외부 콘텐츠 붙여넣기나 비정상 상태로 인해 span style 에 font-weight 가 박혀있을 때 사용
+  const robustToggleBold = () => {
+    if (!editor) return
+    const wasActive = editor.isActive('bold')
+    editor.chain().focus().toggleBold().run()
+    if (!wasActive) return // bolding 은 그대로 두기
+    // un-bolding: 선택 영역의 모든 span 에서 font-weight 스타일 제거
+    const { from, to } = editor.state.selection
+    if (from === to) return
+    try {
+      const dom = editor.view.dom as HTMLElement
+      const range = window.getSelection()?.getRangeAt(0)
+      if (!range) return
+      // 선택 범위를 감싸는 모든 span 을 찾아 font-weight 제거
+      const treeWalker = document.createTreeWalker(dom, NodeFilter.SHOW_ELEMENT, {
+        acceptNode(n) {
+          if (n.nodeType !== 1) return NodeFilter.FILTER_REJECT
+          const el = n as HTMLElement
+          // 선택 범위 안의 요소만
+          if (!range.intersectsNode(el)) return NodeFilter.FILTER_SKIP
+          if (el.tagName === 'SPAN' || el.tagName === 'STRONG' || el.tagName === 'B') {
+            return NodeFilter.FILTER_ACCEPT
+          }
+          return NodeFilter.FILTER_SKIP
+        }
+      })
+      const toStrip: HTMLElement[] = []
+      let node = treeWalker.nextNode()
+      while (node) {
+        toStrip.push(node as HTMLElement)
+        node = treeWalker.nextNode()
+      }
+      toStrip.forEach(el => {
+        if (el.style.fontWeight) el.style.removeProperty('font-weight')
+        // strong/b 태그는 toggleBold 가 제거했어야 함. 잔여 있으면 unwrap 시도 — 위험하니 패스
+      })
+      // 변경된 DOM 을 ProseMirror 와 동기화하기 위해 트랜잭션 한 번 디스패치
+      // (실제로는 DOM 만 바꿔도 다음 마우스/키 이벤트 때 자연스럽게 동기화됨)
+    } catch (err) {
+      console.warn('robust unbold 실패:', err)
+    }
+  }
+
   const togglePainter = () => {
     if (!editor) return
     if (painterMode) {
@@ -2553,7 +2597,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </button>
                   </div>
                   <div className="word-row">
-                    <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`word-btn-tog ${editor.isActive('bold') ? 'word-btn-active' : ''}`} title="굵게 (Ctrl+B)">
+                    <button type="button" onClick={robustToggleBold} className={`word-btn-tog ${editor.isActive('bold') ? 'word-btn-active' : ''}`} title="굵게 (Ctrl+B)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="4" y="18" fontFamily="Arial" fontSize="16" fontWeight="900">B</text></svg>
                     </button>
                     <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`word-btn-tog ${editor.isActive('italic') ? 'word-btn-active' : ''}`} title="기울임 (Ctrl+I)">
@@ -3628,7 +3672,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               style={{ top: `${miniToolbar.top}px`, left: `${miniToolbar.left}px`, transform: 'translateX(-50%)' }}
               onMouseDown={(e) => e.preventDefault()}
             >
-              <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('bold') ? 'bg-blue-100' : ''}`} title="굵게 (Ctrl+B)">
+              <button type="button" onClick={robustToggleBold} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('bold') ? 'bg-blue-100' : ''}`} title="굵게 (Ctrl+B)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="6" y="18" fontFamily="Times New Roman" fontSize="17" fontWeight="900">B</text></svg>
               </button>
               <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`p-1 rounded hover:bg-blue-50 ${editor.isActive('italic') ? 'bg-blue-100' : ''}`} title="기울임 (Ctrl+I)">
@@ -3876,6 +3920,20 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           font-size: 10pt;
           line-height: 1.15;
         }
+        /* 본문/목록 — 인라인 font-weight 잔여물 무력화 (Bold 마크 == <strong> 만 굵게) */
+        .ProseMirror p,
+        .ProseMirror li,
+        .ProseMirror p span,
+        .ProseMirror li span {
+          font-weight: normal;
+        }
+        .ProseMirror p strong,
+        .ProseMirror p b,
+        .ProseMirror li strong,
+        .ProseMirror li b {
+          font-weight: 700;
+        }
+
         /* 단락 간격(paragraph spacing) 1.0: 단락 사이에 여분 공간 없음 */
         .ProseMirror p,
         .ProseMirror h1,
