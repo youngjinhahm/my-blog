@@ -357,6 +357,59 @@ const SmartTypography = Extension.create({
   },
 })
 
+// MS Word 단축키 (브라우저/ProseMirror 기본 외에 추가로 매핑)
+//   Ctrl+L / E / R / J  — 단락 정렬 왼쪽 / 가운데 / 오른쪽 / 양쪽
+//   Ctrl+Shift+L  — 글머리 기호 토글
+//   Ctrl+Shift+8  — 글머리 기호 토글 (Word alt)
+//   Ctrl+Shift+>  — 글자 크기 +2pt (Word 표준)
+//   Ctrl+Shift+<  — 글자 크기 -2pt (Word 표준)
+//   Ctrl+1 / 2 / 5 — 줄간격 1.0 / 2.0 / 1.5
+//   Ctrl+0 — 단락 위 간격 토글 (12px ↔ 0)
+//   Ctrl+Backspace / Ctrl+Delete — 단어 단위 삭제 (브라우저 기본)
+//   Ctrl+Arrow, Shift+Arrow, Ctrl+Shift+Arrow, Home/End, Ctrl+Home/End — 모두 ProseMirror 기본
+const WordShortcuts = Extension.create({
+  name: 'wordShortcuts',
+  addKeyboardShortcuts() {
+    const ed: any = (this as any)
+    const adjustSize = (delta: number) => () => {
+      const editor = ed.editor
+      if (!editor) return false
+      const attrs: any = editor.getAttributes('fontSize') || {}
+      const raw = (attrs.fontSize || '10pt') as string
+      const cur = parseFloat(raw.replace('pt', '')) || 10
+      const next = Math.min(409, Math.max(1, Math.round(cur + delta)))
+      editor.chain().focus().setFontSize(`${next}pt`).run()
+      return true
+    }
+    const setLineHeight = (value: string) => () => {
+      const editor = ed.editor
+      if (!editor) return false
+      ;(editor.chain().focus() as any).setLineHeight(value).run()
+      return true
+    }
+    return {
+      // 정렬
+      'Mod-l': () => ed.editor?.chain().focus().setTextAlign('left').run() ?? false,
+      'Mod-e': () => ed.editor?.chain().focus().setTextAlign('center').run() ?? false,
+      'Mod-r': () => ed.editor?.chain().focus().setTextAlign('right').run() ?? false,
+      'Mod-j': () => ed.editor?.chain().focus().setTextAlign('justify').run() ?? false,
+      // 목록
+      'Mod-Shift-l': () => ed.editor?.chain().focus().toggleBulletList().run() ?? false,
+      'Mod-Shift-8': () => ed.editor?.chain().focus().toggleBulletList().run() ?? false,
+      'Mod-Shift-7': () => ed.editor?.chain().focus().toggleOrderedList().run() ?? false,
+      // 글자 크기 ±2pt (Word 표준)
+      'Mod-Shift->': adjustSize(2),
+      'Mod-Shift-<': adjustSize(-2),
+      'Mod-Shift-.': adjustSize(2),
+      'Mod-Shift-,': adjustSize(-2),
+      // 줄 간격
+      'Mod-1': setLineHeight('1.0'),
+      'Mod-2': setLineHeight('2.0'),
+      'Mod-5': setLineHeight('1.5'),
+    }
+  },
+})
+
 // Page Break Node
 const PageBreak = Node.create({
   name: 'pageBreak',
@@ -846,6 +899,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       Underline,
       FontSize,
       SmartTypography,
+      WordShortcuts,
       LineHeight,
       Indent,
       Color,
@@ -894,6 +948,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editorProps: {
       attributes: {
         class: 'max-w-none focus:outline-none min-h-[26cm]',
+        // 브라우저 맞춤법 검사 비활성화 — agentic / hyperscaler 같은 기술 용어에 빨간줄이
+        // 자꾸 뜨는 문제 해결. (운영체제 사전에 단어를 직접 추가할 방법이 웹 표준에 없음)
+        spellcheck: 'false',
       },
       handleKeyDown: (view, event) => {
         // Ctrl+F = Find
