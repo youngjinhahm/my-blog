@@ -2189,18 +2189,16 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               <div className="word-group">
                 <div className="word-group-body word-font-body">
                   <div className="word-row">
-                    <select onChange={handleFontFamilyChange} className="word-font-select" value={currentFontFamily}>
-                      {/* 빈 값(마크 없음) → 베이스 CSS 기본 = Times New Roman */}
-                      <option value="">Times New Roman</option>
-                      {/* 표준 목록에 없는 글꼴이면 동적 옵션 추가 */}
+                    <select
+                      onChange={handleFontFamilyChange}
+                      className="word-font-select"
+                      // 마크가 없으면(베이스 CSS 기본) Times New Roman 옵션이 자동 선택됨
+                      value={currentFontFamily || "'Times New Roman', Times, serif"}
+                    >
+                      {/* 표준 목록에 없는 글꼴이면 동적 옵션 추가 (예: 다른 곳에서 복사한 콘텐츠) */}
                       {!!currentFontFamily && !KNOWN_FONT_VALUES.has(currentFontFamily) && (
                         <option value={currentFontFamily}>{getFontDisplayName(currentFontFamily)}</option>
                       )}
-                      <optgroup label="최근 사용">
-                        <option value="'Times New Roman', Times, serif" style={{ fontFamily: "'Times New Roman', serif" }}>Times New Roman</option>
-                        <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕 (Body)</option>
-                        <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
-                      </optgroup>
                       <optgroup label="한글 글꼴">
                         <option value="'맑은 고딕', 'Malgun Gothic', sans-serif" style={{ fontFamily: "'Malgun Gothic'" }}>맑은 고딕</option>
                         <option value="'Noto Sans KR', sans-serif" style={{ fontFamily: "'Noto Sans KR'" }}>Noto Sans KR</option>
