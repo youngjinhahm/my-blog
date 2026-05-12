@@ -1567,6 +1567,18 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     setShowCellVAlignMenu(false)
   }
 
+  // 외부에서 content prop 이 바뀌면 (예: 어드민에서 다른 글 [수정] 클릭) 에디터 내용을 갱신.
+  // Tiptap useEditor 는 초기 content 만 쓰므로 prop 변경을 직접 동기화해야 함.
+  // 단, 사용자가 타이핑 중일 때 (editor.getHTML() === content) 는 리렌더하지 않음 (커서 위치 보존).
+  useEffect(() => {
+    if (!editor) return
+    const current = editor.getHTML()
+    // 비교 후 다를 때만 갱신 — onUpdate 의 setContent 무한 루프 방지
+    if (current !== content) {
+      editor.commands.setContent(content || '', { emitUpdate: false })
+    }
+  }, [content, editor])
+
   // 표 셀에 커서가 있으면 표 상단에 플로팅 툴바 표시 (Word 스타일)
   useEffect(() => {
     if (!editor) return
