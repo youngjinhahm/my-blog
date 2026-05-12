@@ -920,7 +920,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   const [pageFooterText, setPageFooterText] = useState('')
   const [editingHeaderFooter, setEditingHeaderFooter] = useState<'header' | 'footer' | null>(null)
   const [headerFooterInput, setHeaderFooterInput] = useState('')
-  const [pageMargins, setPageMargins] = useState({ top: '1.27cm', right: '1.27cm', bottom: '1.27cm', left: '1.27cm' })
+  const [pageMargins, setPageMargins] = useState({ top: '2.54cm', right: '2.54cm', bottom: '2.54cm', left: '2.54cm' })
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const [pageSize, setPageSize] = useState<'A4' | 'Letter' | 'Legal' | 'A3' | 'A5'>('A4')
   const [pageColumns, setPageColumns] = useState<1 | 2 | 3>(1)
