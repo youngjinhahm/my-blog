@@ -37,6 +37,14 @@ const StyledTable = Table.extend({
           return { class: attributes.class }
         },
       },
+      // 표 자체 정렬 (left | center | right) — Word 의 표 위치 정렬
+      align: {
+        default: 'left',
+        parseHTML: element => (element as HTMLElement).getAttribute('data-align') || 'left',
+        renderHTML: attributes => attributes.align && attributes.align !== 'left'
+          ? { 'data-align': attributes.align }
+          : {},
+      },
     }
   },
 })
@@ -1518,6 +1526,22 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editor.chain().focus().setTextSelection(pos).run()
     if (before) editor.chain().focus().addColumnBefore().run()
     else editor.chain().focus().addColumnAfter().run()
+  }
+
+  // 표 자체 정렬 (left/center/right) — 현재 커서가 있는 표의 align 속성 갱신
+  const setTableAlign = (align: 'left' | 'center' | 'right') => {
+    if (!editor) return
+    const { $from } = editor.state.selection
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d)
+      if (node.type.name === 'table') {
+        const pos = $from.before(d)
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, align })
+        )
+        break
+      }
+    }
   }
 
   // 셀 배경색 / 세로 정렬 적용
@@ -3797,6 +3821,17 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   </div>
                 )}
               </div>
+              {/* 표 자체 정렬 (left/center/right) */}
+              <button type="button" onClick={() => setTableAlign('left')} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="표 왼쪽 정렬">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="8" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="7" x2="9" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="3" x2="5" y2="13" stroke="currentColor" strokeWidth="1"/></svg>
+              </button>
+              <button type="button" onClick={() => setTableAlign('center')} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="표 가운데 정렬">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="3" width="8" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="4" y1="7" x2="12" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1"/></svg>
+              </button>
+              <button type="button" onClick={() => setTableAlign('right')} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="표 오른쪽 정렬">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="7" y="3" width="8" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="7" y1="7" x2="15" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="11" y1="3" x2="11" y2="13" stroke="currentColor" strokeWidth="1"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
               {/* 셀 세로 정렬 */}
               <div className="relative">
                 <button type="button" onClick={() => { setShowCellVAlignMenu(v => !v); setShowCellColorMenu(false) }} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 세로 정렬">
@@ -4659,6 +4694,21 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin: 16px 0;
           width: 100%;
           table-layout: fixed;
+        }
+        /* 표 자체 정렬 — center/right 일 때만 width: fit-content 로 좁혀 정렬 효과가 보이게 */
+        .ProseMirror table[data-align="center"] {
+          margin-left: auto;
+          margin-right: auto;
+          width: fit-content;
+        }
+        .ProseMirror table[data-align="right"] {
+          margin-left: auto;
+          margin-right: 0;
+          width: fit-content;
+        }
+        .ProseMirror table[data-align="left"] {
+          margin-left: 0;
+          margin-right: auto;
         }
         .ProseMirror table td,
         .ProseMirror table th {
