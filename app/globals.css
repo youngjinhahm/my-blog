@@ -326,7 +326,7 @@
 }
 
 
-/* === 한글 첫 줄 들여쓰기 — 본문 단락만 === */
+/* === 사용자가 입력한 공백 보존 (단락 시작 스페이스 등) === */
 .post-content > p {
-  text-indent: 1em;
+  white-space: pre-wrap;
 }

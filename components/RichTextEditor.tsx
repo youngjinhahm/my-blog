@@ -17,6 +17,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontFamily from '@tiptap/extension-font-family'
+import Paragraph from '@tiptap/extension-paragraph' 
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 const lowlight = createLowlight(common)
@@ -991,7 +992,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     extensions: [
       StarterKit.configure({
         hardBreak: { keepMarks: false },
-        paragraph: { HTMLAttributes: { class: 'my-0' } },
+        paragraph: false,
         codeBlock: false,
       }),
       CodeBlockLowlight.configure({
@@ -999,6 +1000,12 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         defaultLanguage: null,
         HTMLAttributes: { class: 'code-block' },
       }),
+      // 사용자가 입력한 단락 앞쪽 공백을 보존하기 위해 paragraph 확장 교체
+      Paragraph.extend({
+        parseHTML() {
+          return [{ tag: 'p', preserveWhitespace: 'full' as const }]
+        },
+      }).configure({ HTMLAttributes: { class: 'my-0' } }),
       Underline,
       FontSize,
       SmartTypography,
@@ -3969,9 +3976,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin-top: 0;
           margin-bottom: 0;
         }
-        /* 한글 첫 줄 들여쓰기 — 본문 단락만 (리스트/표 내부 p 제외) */
+        /* 사용자가 입력한 공백 보존 — white-space: pre-wrap (단락의 첫 스페이스 등) */
         .ProseMirror > p {
-          text-indent: 1em;
+          white-space: pre-wrap;
         }
 
         /* 제목 — .post-content 와 동일한 크기/굵기 (WYSIWYG) */
