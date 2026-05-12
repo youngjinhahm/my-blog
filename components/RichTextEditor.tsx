@@ -985,6 +985,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
   // 셀 배경색 / 정렬 메뉴 표시
   const [showCellColorMenu, setShowCellColorMenu] = useState(false)
   const [showCellVAlignMenu, setShowCellVAlignMenu] = useState(false)
+  const [showCellBorderMenu, setShowCellBorderMenu] = useState(false)
   const replaceImageRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
@@ -1073,6 +1074,22 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
           event.preventDefault()
           setShowFindReplace(!showFindReplace)
+          return true
+        }
+        // Ctrl+Shift+V = 서식 없이 붙여넣기
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'v') {
+          event.preventDefault()
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.readText().then(text => {
+              if (text) editor && editor.chain().focus().insertContent(text).run()
+            }).catch(() => {})
+          }
+          return true
+        }
+        // Ctrl+Space = 모든 서식 지우기 (Word 기준: 인라인 마크만 제거)
+        if ((event.ctrlKey || event.metaKey) && event.code === 'Space' && !event.shiftKey) {
+          event.preventDefault()
+          editor && editor.chain().focus().unsetAllMarks().run()
           return true
         }
         // Ctrl+/ = 단축키 도움말 모달
@@ -1537,6 +1554,75 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     editor.chain().focus().setTextSelection(pos).run()
     if (before) editor.chain().focus().addColumnBefore().run()
     else editor.chain().focus().addColumnAfter().run()
+  }
+
+  // 서식 없이 붙여넣기 — 클립보드의 텍스트만 가져와 insertContent (HTML 무시)
+  const pastePlainText = async () => {
+    if (!editor) return
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) editor.chain().focus().insertContent(text).run()
+    } catch (err) {
+      console.warn('서식 없이 붙여넣기 실패:', err)
+    }
+  }
+
+  // 모든 서식 지우기 — 인라인 마크 전부 제거 (블록 노드는 유지)
+  const clearAllFormatting = () => {
+    if (!editor) return
+    editor.chain().focus().unsetAllMarks().run()
+  }
+
+  // 표 행 균등 분할 — 모든 tableRow 의 height 속성 제거 (auto 로 복귀)
+  const distributeRows = () => {
+    if (!editor) return
+    const { $from } = editor.state.selection
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        const tablePos = $from.before(d)
+        const tableNode = $from.node(d)
+        const tr = editor.state.tr
+        let offset = tablePos + 1
+        tableNode.forEach((row) => {
+          if (row.type.name === 'tableRow') {
+            tr.setNodeMarkup(offset, undefined, { ...row.attrs, height: null })
+          }
+          offset += row.nodeSize
+        })
+        editor.view.dispatch(tr)
+        break
+      }
+    }
+  }
+
+  // 표 열 균등 분할 — 모든 cell 의 colwidth 제거 (auto 로 복귀)
+  const distributeColumns = () => {
+    if (!editor) return
+    const { $from } = editor.state.selection
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        const tablePos = $from.before(d)
+        const tableNode = $from.node(d)
+        const tr = editor.state.tr
+        tableNode.descendants((node, relPos) => {
+          if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+            tr.setNodeMarkup(tablePos + 1 + relPos, undefined, { ...node.attrs, colwidth: null })
+            return false
+          }
+          return true
+        })
+        editor.view.dispatch(tr)
+        break
+      }
+    }
+  }
+
+  // 셀 테두리 스타일 적용 — 현재 셀의 모든 4 변에 (style + width + color)
+  const setCellBorders = (style: 'solid' | 'dashed' | 'dotted' | 'none', width: number, color: string) => {
+    if (!editor) return
+    const value = style === 'none' ? null : `${width}px ${style} ${color}`
+    const attrs = { borderTop: value, borderRight: value, borderBottom: value, borderLeft: value }
+    editor.chain().focus().updateAttributes('tableCell', attrs).updateAttributes('tableHeader', attrs).run()
   }
 
   // 표 자체 정렬 (left/center/right) — 현재 커서가 있는 표의 align 속성 갱신
@@ -2513,6 +2599,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                       <svg className="word-icon-24" viewBox="0 0 24 24" fill="none"><path d="M9 2h6a1 1 0 011 1v1h3a1 1 0 011 1v15a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1h3V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" fill="#fff"/><rect x="8" y="2.5" width="8" height="3" rx="0.5" fill="#2b579a"/><line x1="7" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1"/><line x1="7" y1="13" x2="17" y2="13" stroke="currentColor" strokeWidth="1"/><line x1="7" y1="16" x2="14" y2="16" stroke="currentColor" strokeWidth="1"/></svg>
                       <span className="word-btn-label">붙여넣기</span>
                     </button>
+                    <button type="button" onClick={pastePlainText} className="word-btn-small mt-1" title="서식 없이 붙여넣기 (Ctrl+Shift+V)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 2h6a1 1 0 011 1v1h3a1 1 0 011 1v15a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1h3V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" fill="#fff"/><text x="9" y="17" fontSize="9" fontWeight="700" fill="currentColor">T</text></svg>
+                      <span style={{ fontSize: 10 }}>서식 없이</span>
+                    </button>
                   </div>
                   <div className="word-group-col" style={{ gap: 2 }}>
                     <button type="button" onClick={() => { try { document.execCommand('cut') } catch {} }} className="word-btn-small" title="잘라내기 (Ctrl+X)">
@@ -2623,6 +2713,9 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                     </button>
                     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => stepFontSize(-1)} className="word-btn-mini" title="글자 크기 작게">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="5" y="17" fontFamily="Arial" fontSize="13" fontWeight="700">A</text><text x="14" y="17" fontFamily="Arial" fontSize="9" fontWeight="700">v</text></svg>
+                    </button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={clearAllFormatting} className="word-btn-mini" title="모든 서식 지우기 (Ctrl+Space)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 4l6 6-8 8H6l-2-4 10-10z" stroke="currentColor" strokeWidth="1.4" fill="#fbcfe8"/><line x1="3" y1="20" x2="21" y2="20" stroke="currentColor" strokeWidth="1.5"/></svg>
                     </button>
                     <div className="relative">
                       <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowCaseMenu(!showCaseMenu); setShowLineSpacingMenu(false) }} className="word-btn-mini word-btn-chevron" title="대/소문자 바꾸기">
@@ -3844,6 +3937,53 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
                   </div>
                 )}
               </div>
+              {/* 행/열 균등 분할 */}
+              <button type="button" onClick={distributeRows} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="행 높이 균등 분할">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1"/><line x1="1" y1="10" x2="15" y2="10" stroke="currentColor" strokeWidth="1"/><path d="M11 3l2 1.5L11 6" stroke="#2563eb" strokeWidth="1.2" fill="none"/><path d="M11 13l2-1.5L11 10" stroke="#2563eb" strokeWidth="1.2" fill="none"/></svg>
+              </button>
+              <button type="button" onClick={distributeColumns} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="열 너비 균등 분할">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="6" y1="1" x2="6" y2="15" stroke="currentColor" strokeWidth="1"/><line x1="10" y1="1" x2="10" y2="15" stroke="currentColor" strokeWidth="1"/><path d="M3 11l1.5-2L6 11" stroke="#2563eb" strokeWidth="1.2" fill="none"/><path d="M13 11l-1.5-2L10 11" stroke="#2563eb" strokeWidth="1.2" fill="none"/></svg>
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
+              {/* 셀 테두리 스타일 */}
+              <div className="relative">
+                <button type="button" onClick={() => { setShowCellBorderMenu(v => !v); setShowCellColorMenu(false); setShowCellVAlignMenu(false) }} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="셀 테두리 스타일">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="5" y="5" width="6" height="6" stroke="currentColor" strokeWidth="1" strokeDasharray="1.5 1.5" fill="none"/></svg>
+                </button>
+                {showCellBorderMenu && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-2 w-[240px]">
+                    <div className="text-[11px] text-gray-500 font-semibold mb-1.5">테두리 스타일</div>
+                    <div className="grid grid-cols-3 gap-1 mb-2">
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('solid', 1, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '1px solid #000', width: '100%', marginBottom: 2 }} />실선 1px
+                      </button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('solid', 2, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '2px solid #000', width: '100%', marginBottom: 2 }} />실선 2px
+                      </button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('solid', 3, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '3px solid #000', width: '100%', marginBottom: 2 }} />실선 3px
+                      </button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('dashed', 1, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '1px dashed #000', width: '100%', marginBottom: 2 }} />점선 1px
+                      </button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('dashed', 2, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '2px dashed #000', width: '100%', marginBottom: 2 }} />점선 2px
+                      </button>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('dotted', 2, '#000000'); setShowCellBorderMenu(false) }} className="border border-gray-200 rounded p-2 hover:bg-blue-50 text-[10px]">
+                        <div style={{ borderTop: '2px dotted #000', width: '100%', marginBottom: 2 }} />도트
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-gray-500 font-semibold mb-1.5">색상</div>
+                    <div className="grid grid-cols-6 gap-1 mb-2">
+                      {['#000000','#6b7280','#dc2626','#ea580c','#ca8a04','#16a34a','#0891b2','#2563eb','#9333ea','#db2777','#ffffff','#9ca3af'].map(c => (
+                        <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCellBorders('solid', 1, c); setShowCellBorderMenu(false) }} className="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition" style={{ background: c }} title={`실선 1px ${c}`} />
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => { setCellBorders('none', 0, ''); setShowCellBorderMenu(false) }} className="w-full text-[11px] py-1 rounded hover:bg-gray-100 text-gray-700">테두리 제거</button>
+                  </div>
+                )}
+              </div>
+              <div className="w-px h-5 bg-gray-200 mx-0.5"></div>
               {/* 표 자체 정렬 (left/center/right) */}
               <button type="button" onClick={() => setTableAlign('left')} className="p-1.5 hover:bg-blue-50 rounded text-gray-700" title="표 왼쪽 정렬">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="8" height="10" stroke="currentColor" strokeWidth="1.2" fill="none"/><line x1="1" y1="7" x2="9" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="3" x2="5" y2="13" stroke="currentColor" strokeWidth="1"/></svg>
