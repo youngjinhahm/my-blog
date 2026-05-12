@@ -7,6 +7,8 @@ export async function GET() {
     const { data, error } = await supabase
       .from('posts')
       .select('id')
+      .eq('published', true)
+      .eq('is_private', false)
       .limit(1)
 
     if (error) {
