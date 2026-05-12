@@ -3969,6 +3969,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
           margin-top: 0;
           margin-bottom: 0;
         }
+        /* 한글 첫 줄 들여쓰기 — 본문 단락만 (리스트/표 내부 p 제외) */
+        .ProseMirror > p {
+          text-indent: 1em;
+        }
 
         /* 제목 — .post-content 와 동일한 크기/굵기 (WYSIWYG) */
         .ProseMirror h1 { font-size: 18pt; font-weight: 700; margin-top: 16px; line-height: 1.1; }

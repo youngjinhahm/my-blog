@@ -324,3 +324,9 @@
   margin-left: 0;
   margin-right: auto;
 }
+
+
+/* === 한글 첫 줄 들여쓰기 — 본문 단락만 === */
+.post-content > p {
+  text-indent: 1em;
+}
