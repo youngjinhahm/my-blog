@@ -51,18 +51,49 @@ const StyledTable = Table.extend({
 })
 
 // 셀 공통 속성 (배경색 + 4방향 개별 테두리)
+// 셀의 border shorthand (border: 1px solid black) 도 변별 파싱해서 4 방향에 적용
+const parseBorderSide = (el: HTMLElement, side: 'Top' | 'Right' | 'Bottom' | 'Left'): string | null => {
+  const cssStyle: any = (el as HTMLElement).style as any
+  const sideValue = cssStyle['border' + side] as string
+  if (sideValue && sideValue.trim()) return sideValue
+  const shorthand = cssStyle.border as string
+  if (shorthand && shorthand.trim()) return shorthand
+  return null
+}
+
 const cellExtraAttrs = () => ({
   backgroundColor: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.backgroundColor || null,
+    parseHTML: (element: HTMLElement) => {
+      // Excel 은 background, background-color 모두 사용 가능
+      return (element.style.backgroundColor || (element.style as any).background) || null
+    },
     renderHTML: (attributes: any) => {
       if (!attributes.backgroundColor) return {}
       return { style: `background-color: ${attributes.backgroundColor}` }
     },
   },
+  // 셀 텍스트 색상 (Excel/Word 에서 <td style="color: red"> 형태로 옴)
+  textColor: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => element.style.color || null,
+    renderHTML: (attributes: any) => {
+      if (!attributes.textColor) return {}
+      return { style: `color: ${attributes.textColor}` }
+    },
+  },
+  // 셀 가로 정렬 (Excel 에서 <td style="text-align: center">)
+  cellTextAlign: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => element.style.textAlign || (element.getAttribute('align') || null),
+    renderHTML: (attributes: any) => {
+      if (!attributes.cellTextAlign) return {}
+      return { style: `text-align: ${attributes.cellTextAlign}` }
+    },
+  },
   verticalAlign: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.verticalAlign || null,
+    parseHTML: (element: HTMLElement) => element.style.verticalAlign || element.getAttribute('valign') || null,
     renderHTML: (attributes: any) => {
       if (!attributes.verticalAlign) return {}
       return { style: `vertical-align: ${attributes.verticalAlign}` }
@@ -70,7 +101,7 @@ const cellExtraAttrs = () => ({
   },
   borderTop: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderTop || null,
+    parseHTML: (element: HTMLElement) => parseBorderSide(element, 'Top'),
     renderHTML: (attributes: any) => {
       if (!attributes.borderTop) return {}
       return { style: `border-top: ${attributes.borderTop}` }
@@ -78,7 +109,7 @@ const cellExtraAttrs = () => ({
   },
   borderRight: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderRight || null,
+    parseHTML: (element: HTMLElement) => parseBorderSide(element, 'Right'),
     renderHTML: (attributes: any) => {
       if (!attributes.borderRight) return {}
       return { style: `border-right: ${attributes.borderRight}` }
@@ -86,7 +117,7 @@ const cellExtraAttrs = () => ({
   },
   borderBottom: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderBottom || null,
+    parseHTML: (element: HTMLElement) => parseBorderSide(element, 'Bottom'),
     renderHTML: (attributes: any) => {
       if (!attributes.borderBottom) return {}
       return { style: `border-bottom: ${attributes.borderBottom}` }
@@ -94,7 +125,7 @@ const cellExtraAttrs = () => ({
   },
   borderLeft: {
     default: null as string | null,
-    parseHTML: (element: HTMLElement) => (element as HTMLElement).style.borderLeft || null,
+    parseHTML: (element: HTMLElement) => parseBorderSide(element, 'Left'),
     renderHTML: (attributes: any) => {
       if (!attributes.borderLeft) return {}
       return { style: `border-left: ${attributes.borderLeft}` }
