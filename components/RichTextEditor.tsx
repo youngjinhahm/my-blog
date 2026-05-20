@@ -1489,10 +1489,11 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, zoomLevel])
 
-  // 표 호버 시 행/열 사이에 "+" 버튼 노출 (Word 스타일)
+  // 표 호버 시 행/열 경계 근처에서만 "+" 버튼 노출 (Word 스타일 — 경계에 마우스 올렸을 때만)
   useEffect(() => {
     if (!editor) return
     const root = editor.view.dom as HTMLElement
+    const EDGE_THRESHOLD = 6 // px — 경계로부터 이 거리 내에 마우스가 있을 때만 인서트 버튼 표시
     const onMove = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
       const tableEl = target?.closest && target.closest('table')
@@ -1500,43 +1501,65 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         setTableInserts(null)
         return
       }
-      // 마우스가 표 + 여백 16px 영역 안인지 확인 (살짝 바깥에서도 호버 유지)
       const rect = (tableEl as HTMLElement).getBoundingClientRect()
-      const PAD = 20
-      if (e.clientX < rect.left - PAD || e.clientX > rect.right + PAD ||
-          e.clientY < rect.top - PAD || e.clientY > rect.bottom + PAD) {
+      // 표 경계 약간 바깥까지만 영역으로 인정 (여백 너무 크면 항상 보임)
+      const OUTER = EDGE_THRESHOLD + 4
+      if (e.clientX < rect.left - OUTER || e.clientX > rect.right + OUTER ||
+          e.clientY < rect.top - OUTER || e.clientY > rect.bottom + OUTER) {
         setTableInserts(null)
         return
       }
-      // 줌 보정용
       const pageRect = editor.view.dom.closest('.editor-page')?.getBoundingClientRect()
         || editor.view.dom.getBoundingClientRect()
       const z = (zoomLevel || 100) / 100
-      // 각 행의 top/bottom 위치 (table 기준 상대 좌표, 줌 보정 후)
+
+      // 행 경계 후보 수집 (각 행의 top/bottom)
       const trs = (tableEl as HTMLElement).querySelectorAll('tr')
-      const rowGaps: Array<{ y: number; rowIdx: number; before: boolean }> = []
+      let closestRowGap: { y: number; rowIdx: number; before: boolean; absY: number } | null = null
       trs.forEach((tr, idx) => {
         const r = (tr as HTMLElement).getBoundingClientRect()
+        // 첫 행의 top
         if (idx === 0) {
-          rowGaps.push({ y: (r.top - rect.top) / z, rowIdx: 0, before: true })
+          const d = Math.abs(e.clientY - r.top)
+          if (d <= EDGE_THRESHOLD && (!closestRowGap || d < Math.abs(e.clientY - closestRowGap.absY))) {
+            closestRowGap = { y: (r.top - rect.top) / z, rowIdx: 0, before: true, absY: r.top }
+          }
         }
-        rowGaps.push({ y: (r.bottom - rect.top) / z, rowIdx: idx, before: false })
+        // 모든 행의 bottom
+        const db = Math.abs(e.clientY - r.bottom)
+        if (db <= EDGE_THRESHOLD && (!closestRowGap || db < Math.abs(e.clientY - (closestRowGap as any).absY))) {
+          closestRowGap = { y: (r.bottom - rect.top) / z, rowIdx: idx, before: false, absY: r.bottom }
+        }
       })
-      // 각 열의 left/right (첫 번째 행의 셀 기준)
+
+      // 열 경계 후보 수집 (첫 행 셀의 left/right)
       const cells0 = trs[0]?.querySelectorAll('td, th')
-      const colGaps: Array<{ x: number; colIdx: number; before: boolean }> = []
+      let closestColGap: { x: number; colIdx: number; before: boolean; absX: number } | null = null
       if (cells0) {
         cells0.forEach((cell, idx) => {
           const r = (cell as HTMLElement).getBoundingClientRect()
           if (idx === 0) {
-            colGaps.push({ x: (r.left - rect.left) / z, colIdx: 0, before: true })
+            const d = Math.abs(e.clientX - r.left)
+            if (d <= EDGE_THRESHOLD && (!closestColGap || d < Math.abs(e.clientX - closestColGap.absX))) {
+              closestColGap = { x: (r.left - rect.left) / z, colIdx: 0, before: true, absX: r.left }
+            }
           }
-          colGaps.push({ x: (r.right - rect.left) / z, colIdx: idx, before: false })
+          const dr = Math.abs(e.clientX - r.right)
+          if (dr <= EDGE_THRESHOLD && (!closestColGap || dr < Math.abs(e.clientX - (closestColGap as any).absX))) {
+            closestColGap = { x: (r.right - rect.left) / z, colIdx: idx, before: false, absX: r.right }
+          }
         })
       }
+
+      // 후보가 둘 다 없으면 숨김
+      if (!closestRowGap && !closestColGap) {
+        setTableInserts(null)
+        return
+      }
+
       setTableInserts({
-        rowGaps,
-        colGaps,
+        rowGaps: closestRowGap ? [{ y: (closestRowGap as any).y, rowIdx: (closestRowGap as any).rowIdx, before: (closestRowGap as any).before }] : [],
+        colGaps: closestColGap ? [{ x: (closestColGap as any).x, colIdx: (closestColGap as any).colIdx, before: (closestColGap as any).before }] : [],
         tableTop: (rect.top - pageRect.top) / z,
         tableLeft: (rect.left - pageRect.left) / z,
         tableId: String((tableEl as HTMLElement).offsetTop) + 'x' + String((tableEl as HTMLElement).offsetLeft),

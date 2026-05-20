@@ -340,3 +340,56 @@
 .post-content > p:empty::before {
   content: '\00a0';
 }
+
+
+/* === 표 스타일 프리셋 (공개 페이지) === */
+.post-content table td,
+.post-content table th {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+.post-content table.tbl-grid td,
+.post-content table.tbl-grid th { border: 1px solid #000000; }
+.post-content table.tbl-grid th { background-color: #f3f4f6; font-weight: 700; }
+
+.post-content table.tbl-plain td,
+.post-content table.tbl-plain th { border: 1px solid #e5e7eb; }
+.post-content table.tbl-plain th { font-weight: 700; border-bottom: 2px solid #6b7280; }
+
+.post-content table.tbl-striped td,
+.post-content table.tbl-striped th { border: 1px solid #e5e7eb; }
+.post-content table.tbl-striped th { background-color: #4b5563; color: #fff; font-weight: 700; }
+.post-content table.tbl-striped tr:nth-child(even) td { background-color: #f9fafb; }
+
+.post-content table.tbl-header td,
+.post-content table.tbl-header th { border: 1px solid #d1d5db; }
+.post-content table.tbl-header th { background-color: #1e40af; color: #fff; font-weight: 700; }
+
+.post-content table.tbl-colorful td,
+.post-content table.tbl-colorful th { border: 1px solid #a78bfa; }
+.post-content table.tbl-colorful th { background-color: #7c3aed; color: #fff; font-weight: 700; }
+.post-content table.tbl-colorful tr:nth-child(even) td { background-color: #f5f3ff; }
+
+.post-content table.tbl-minimal td,
+.post-content table.tbl-minimal th { border: none; border-bottom: 1px solid #e5e7eb; }
+.post-content table.tbl-minimal th { font-weight: 700; border-bottom: 2px solid #111827; text-align: left; }
+
+.post-content table.tbl-dark td,
+.post-content table.tbl-dark th { border: 1px solid #374151; background-color: #1f2937; color: #f3f4f6; }
+.post-content table.tbl-dark th { background-color: #111827; color: #fff; font-weight: 700; }
+
+/* Word 스타일 옵션 (view) */
+.post-content table.header-row tr:first-child td,
+.post-content table.header-row tr:first-child th { background-color: #1e40af; color: #fff; font-weight: 700; }
+.post-content table.total-row tr:last-child td,
+.post-content table.total-row tr:last-child th { border-top: 2px solid #1e3a8a; border-bottom: 2px solid #1e3a8a; font-weight: 700; background-color: #eff6ff; }
+.post-content table.banded-rows tr:nth-child(even) td,
+.post-content table.banded-rows tr:nth-child(even) th { background-color: #f3f4f6; }
+.post-content table.first-column td:first-child,
+.post-content table.first-column th:first-child { font-weight: 700; background-color: #eff6ff; }
+.post-content table.last-column td:last-child,
+.post-content table.last-column th:last-child { font-weight: 700; background-color: #eff6ff; }
+.post-content table.banded-columns td:nth-child(even),
+.post-content table.banded-columns th:nth-child(even) { background-color: #f9fafb; }
+
+
